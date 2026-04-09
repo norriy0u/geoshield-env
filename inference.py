@@ -27,8 +27,6 @@ client = OpenAI(
     api_key=HF_TOKEN,
 )
 
-# ── Prompts ────────────────────────────────────────────────────────────────────
-
 SYSTEM_PROMPT = """You are a satellite intelligence analyst. You will receive
 intelligence reports and must respond with precise JSON actions.
 
@@ -52,38 +50,36 @@ For Task 4 (covert operation detection):
 Always respond with valid JSON only. No explanation outside the JSON."""
 
 
+def clamp(score: float) -> float:
+    """Ensure score is strictly between 0 and 1."""
+    return round(max(0.01, min(0.99, float(score))), 4)
+
+
 def build_user_prompt(obs: dict) -> str:
     task_id = obs.get("task_id", 1)
     lines = [f"TASK {task_id} | Case: {obs.get('case_id')} | Step: {obs.get('step')} | Difficulty: {obs.get('difficulty')}"]
 
     if obs.get("report"):
         lines.append(f"\nREPORT:\n{obs['report']}")
-
     if obs.get("context"):
         lines.append(f"\nCONTEXT: {obs['context']}")
-
     if obs.get("sectors"):
         lines.append("\nSECTOR REPORTS:")
         for s in obs["sectors"]:
             if isinstance(s, dict):
                 lines.append(f"  [{s.get('sector_id','?').upper()}] {s.get('summary','')} | Anomaly: {s.get('anomaly_type','none')} | Confidence: {s.get('confidence',0):.0%}")
-
     if obs.get("investigation_results"):
         lines.append("\nINVESTIGATION RESULTS:")
         for k, v in obs["investigation_results"].items():
             lines.append(f"  {k}: {v}")
-
     if obs.get("steps_remaining") is not None:
         lines.append(f"\nSteps remaining: {obs['steps_remaining']}")
 
     lines.append(f"\nAvailable actions: {obs.get('available_actions', [])}")
     lines.append(f"\nHint: {obs.get('hint', '')}")
     lines.append("\nRespond with JSON only.")
-
     return "\n".join(lines)
 
-
-# ── LLM call ───────────────────────────────────────────────────────────────────
 
 def call_llm(user_prompt: str) -> dict:
     try:
@@ -102,11 +98,9 @@ def call_llm(user_prompt: str) -> dict:
     except json.JSONDecodeError:
         return {"action": "ignore", "reasoning": "parse error"}
     except Exception as e:
-        print(f"[LLM ERROR] {e}", file=sys.stderr, flush=True)
+        print(f"[ERROR] llm_error={e}", file=sys.stderr, flush=True)
         return {"action": "ignore", "reasoning": str(e)}
 
-
-# ── Env helpers ────────────────────────────────────────────────────────────────
 
 def env_reset(task_id: int, seed: int = SEED) -> dict:
     r = requests.post(f"{ENV_URL}/reset", json={"task_id": task_id, "seed": seed}, timeout=30)
@@ -120,8 +114,6 @@ def env_step(session_id: str, action: dict) -> dict:
     r.raise_for_status()
     return r.json()
 
-
-# ── Run one episode ────────────────────────────────────────────────────────────
 
 def run_episode(task_id: int, seed: int = SEED) -> float:
     reset_data   = env_reset(task_id, seed)
@@ -142,11 +134,13 @@ def run_episode(task_id: int, seed: int = SEED) -> float:
         action      = call_llm(user_prompt)
 
         step_data    = env_step(session_id, action)
-        reward       = step_data.get("reward", 0.0)
+        raw_reward   = step_data.get("reward", 0.01)
+        reward       = clamp(raw_reward)
         done         = step_data.get("done", True)
         info         = step_data.get("info", {})
         obs          = step_data.get("observation", obs)
-        total_reward = info.get("total_score", reward)
+        raw_total    = info.get("total_score", reward)
+        total_reward = clamp(raw_total)
 
         print(f"[STEP] task={task_id} step={step_num} action={action.get('action','')} reward={reward} done={done}", flush=True)
 
@@ -154,11 +148,8 @@ def run_episode(task_id: int, seed: int = SEED) -> float:
             time.sleep(0.5)
 
     print(f"[END] task={task_id} case={case_id} score={total_reward} steps={step_num}", flush=True)
-
     return total_reward
 
-
-# ── Main ───────────────────────────────────────────────────────────────────────
 
 def main():
     print(f"[START] run=geoshield_baseline model={MODEL_NAME} tasks={TASKS}", flush=True)
@@ -167,13 +158,13 @@ def main():
     for task_id in TASKS:
         try:
             score = run_episode(task_id, seed=SEED)
-            results[f"task_{task_id}"] = round(score, 4)
+            results[f"task_{task_id}"] = clamp(score)
         except Exception as e:
             print(f"[ERROR] task={task_id} error={e}", file=sys.stderr, flush=True)
             results[f"task_{task_id}"] = 0.01
         time.sleep(1)
 
-    overall = round(sum(results.values()) / len(results), 4)
+    overall = clamp(sum(results.values()) / len(results))
     results["overall"] = overall
 
     print(f"[END] run=geoshield_baseline score={overall} results={json.dumps(results)}", flush=True)
