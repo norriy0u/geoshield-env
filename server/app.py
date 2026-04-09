@@ -152,6 +152,24 @@ def step(req: StepRequest):
 
     result = env.step(action_input)
     result["session_id"] = req.session_id
+
+    # Hard clamp at API boundary — validator requires strictly (0, 1)
+    def _c(v):
+        try: return round(max(0.01, min(0.99, float(v))), 4)
+        except: return 0.01
+
+    result["reward"] = _c(result.get("reward", 0.01))
+    if "info" in result:
+        if "total_score" in result["info"]:
+            result["info"]["total_score"] = _c(result["info"]["total_score"])
+    if "state" in result:
+        if "total_score" in result.get("state", {}):
+            result["state"]["total_score"] = _c(result["state"]["total_score"])
+
+    return result
+
+    result = env.step(action_input)
+    result["session_id"] = req.session_id
     return result
 
 
