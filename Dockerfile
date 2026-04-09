@@ -20,7 +20,7 @@ COPY openenv.yaml .
 COPY inference.py .
 
 # Set Python path
-ENV PYTHONPATH="/app:/app/src/geoshield"
+ENV PYTHONPATH="/app:/app/src/geoshield:/app/server"
 
 # Expose port
 EXPOSE 7860
