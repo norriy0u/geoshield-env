@@ -22,10 +22,12 @@ def deep_clamp(obj):
         return {k: deep_clamp(v) for k, v in obj.items()}
     elif isinstance(obj, list):
         return [deep_clamp(i) for i in obj]
-    elif isinstance(obj, float):
-        if obj == 0.0:
+    elif isinstance(obj, bool):   # ← check bool BEFORE int/float
+        return obj
+    elif isinstance(obj, (int, float)):   # ← add int here
+        if obj == 0:
             return 0.01
-        if obj == 1.0:
+        if obj == 1:
             return 0.99
         return obj
     return obj
