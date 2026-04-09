@@ -3,7 +3,11 @@ from src.geoshield.models import GeoShieldAction, GeoReward
 from src.geoshield.constants import STRATEGIC_KEYWORDS
 
 
-# ── Task 1 grader ─────────────────────────────────────────────────────────────
+def _clamp(score: float) -> float:
+    return round(max(0.01, min(0.99, float(score))), 4)
+
+
+# ── Task 1 grader ──────────────────────────────────────────────────────────────
 
 def grade_task1(action: GeoShieldAction, case: Dict[str, Any]) -> GeoReward:
     gold = case.get("gold_action")
@@ -11,18 +15,18 @@ def grade_task1(action: GeoShieldAction, case: Dict[str, Any]) -> GeoReward:
 
     if correct:
         return GeoReward(
-            score=0.99,
+            score=_clamp(0.99),
             feedback=f"Correct! '{action.action}' matches gold action.",
             breakdown={"action_score": 0.99}
         )
     return GeoReward(
-        score=0.01,
+        score=_clamp(0.01),
         feedback=f"Incorrect. Expected '{gold}', got '{action.action}'.",
         breakdown={"action_score": 0.01}
     )
 
 
-# ── Task 2 grader ─────────────────────────────────────────────────────────────
+# ── Task 2 grader ──────────────────────────────────────────────────────────────
 
 RELATED_THREATS = {
     "troop_movement": ["weapons_cache", "illegal_construction"],
@@ -37,7 +41,6 @@ def grade_task2(action: GeoShieldAction, case: Dict[str, Any]) -> GeoReward:
     gold_level = case.get("gold_threat_level", 5)
     predicted_level = action.threat_level or 5
 
-    # Classification score
     if action.action == gold_action:
         class_score = 0.99
     elif action.action in RELATED_THREATS.get(gold_action, []):
@@ -45,7 +48,6 @@ def grade_task2(action: GeoShieldAction, case: Dict[str, Any]) -> GeoReward:
     else:
         class_score = 0.01
 
-    # Threat level score
     diff = abs(predicted_level - gold_level)
     if diff == 0:
         level_score = 0.99
@@ -58,8 +60,7 @@ def grade_task2(action: GeoShieldAction, case: Dict[str, Any]) -> GeoReward:
     else:
         level_score = 0.10
 
-    final = round(0.5 * class_score + 0.5 * level_score, 3)
-    final = max(0.01, min(0.99, final))
+    final = _clamp(0.5 * class_score + 0.5 * level_score)
 
     return GeoReward(
         score=final,
@@ -76,30 +77,28 @@ def grade_task2(action: GeoShieldAction, case: Dict[str, Any]) -> GeoReward:
     )
 
 
-# ── Task 3 grader ─────────────────────────────────────────────────────────────
+# ── Task 3 grader ──────────────────────────────────────────────────────────────
 
 def grade_task3(action: GeoShieldAction, case: Dict[str, Any]) -> GeoReward:
     gold_action = case.get("gold_action")
     second_best = case.get("second_best_sector", "")
 
-    # Handle investigate actions
     if action.action.startswith("investigate_"):
         sector = action.action.replace("investigate_", "")
         gold_sector = gold_action.replace("deploy_to_", "")
         if sector == gold_sector:
             return GeoReward(
-                score=0.55,
+                score=_clamp(0.55),
                 feedback=f"Good — investigating the right sector ({sector}). Now deploy.",
                 breakdown={"investigate_score": 0.55}
             )
         else:
             return GeoReward(
-                score=0.25,
+                score=_clamp(0.25),
                 feedback=f"Investigating {sector} — not the highest priority sector.",
                 breakdown={"investigate_score": 0.25}
             )
 
-    # Sector selection score
     if action.action == gold_action:
         sector_score = 0.99
     elif action.action == second_best:
@@ -107,7 +106,6 @@ def grade_task3(action: GeoShieldAction, case: Dict[str, Any]) -> GeoReward:
     else:
         sector_score = 0.01
 
-    # Reasoning score
     reasoning = action.reasoning or ""
     reasoning_score = 0.10
 
@@ -128,8 +126,7 @@ def grade_task3(action: GeoShieldAction, case: Dict[str, Any]) -> GeoReward:
 
     reasoning_score = min(reasoning_score, 0.99)
 
-    final = round(0.5 * sector_score + 0.5 * reasoning_score, 3)
-    final = max(0.01, min(0.99, final))
+    final = _clamp(0.5 * sector_score + 0.5 * reasoning_score)
 
     return GeoReward(
         score=final,
@@ -147,7 +144,7 @@ def grade_task3(action: GeoShieldAction, case: Dict[str, Any]) -> GeoReward:
     )
 
 
-# ── Task 4 grader ─────────────────────────────────────────────────────────────
+# ── Task 4 grader ──────────────────────────────────────────────────────────────
 
 DECEPTION_TYPES = {
     "civilian_military": "Military assets disguised as civilian infrastructure",
@@ -162,15 +159,13 @@ def grade_task4(action: GeoShieldAction, case: Dict[str, Any]) -> GeoReward:
     gold_cover = case.get("gold_cover_story", "")
     gold_deception = case.get("gold_deception_type", "")
 
-    # Primary classification score
     if action.action == gold_action:
         class_score = 0.99
     elif action.action == "request_verification" and gold_action == "covert_operation":
-        class_score = 0.50  # partial credit for cautious approach
+        class_score = 0.50
     else:
         class_score = 0.01
 
-    # Cover story identification score
     cover_score = 0.01
     identified_cover = (action.cover_story_identified or "").lower()
     gold_cover_lower = gold_cover.lower()
@@ -184,7 +179,6 @@ def grade_task4(action: GeoShieldAction, case: Dict[str, Any]) -> GeoReward:
     elif hits >= 1:
         cover_score = 0.40
 
-    # Deception type score
     deception_score = 0.01
     if action.deception_type and gold_deception:
         if action.deception_type == gold_deception:
@@ -192,7 +186,6 @@ def grade_task4(action: GeoShieldAction, case: Dict[str, Any]) -> GeoReward:
         elif action.deception_type in DECEPTION_TYPES:
             deception_score = 0.30
 
-    # Reasoning score
     reasoning = action.reasoning or ""
     reasoning_score = 0.10
     if len(reasoning) > 50:
@@ -208,15 +201,12 @@ def grade_task4(action: GeoShieldAction, case: Dict[str, Any]) -> GeoReward:
         reasoning_score += 0.15
     reasoning_score = min(reasoning_score, 0.99)
 
-    # Weighted final
-    final = round(
+    final = _clamp(
         0.40 * class_score +
         0.25 * cover_score +
         0.15 * deception_score +
-        0.20 * reasoning_score,
-        3
+        0.20 * reasoning_score
     )
-    final = max(0.01, min(0.99, final))
 
     return GeoReward(
         score=final,
@@ -237,7 +227,7 @@ def grade_task4(action: GeoShieldAction, case: Dict[str, Any]) -> GeoReward:
     )
 
 
-# ── Registry ──────────────────────────────────────────────────────────────────
+# ── Registry ───────────────────────────────────────────────────────────────────
 
 GRADERS = {
     1: grade_task1,

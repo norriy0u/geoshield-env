@@ -115,10 +115,12 @@ class GeoShieldEnvironment:
         if grader is None:
             raise ValueError(f"No grader for task {self.task_id}")
 
-        reward: GeoReward = grader(action, self.case)
-        self.rewards.append(reward.score)
-        self.total_score = round(sum(self.rewards) / len(self.rewards), 4)
-        self.done = True
+   reward: GeoReward = grader(action, self.case)
+clamped = round(max(0.01, min(0.99, float(reward.score))), 4)
+reward.score = clamped
+self.rewards.append(clamped)
+self.total_score = round(max(0.01, min(0.99, sum(self.rewards) / len(self.rewards))), 4)
+self.done = True
 
         obs = self._build_observation()
         return {
