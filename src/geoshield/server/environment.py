@@ -6,10 +6,10 @@ import uuid
 import time
 from typing import Dict, Any, Optional
 
-from models import GeoShieldAction, GeoObservation, GeoReward, GeoState, SectorReport
-from constants import TASK_ACTIONS, MAX_STEPS
-from generators import sample_case
-from graders import GRADERS
+from src.geoshield.models import GeoShieldAction, GeoObservation, GeoReward, GeoState, SectorReport
+from src.geoshield.constants import TASK_ACTIONS, MAX_STEPS
+from src.geoshield.server.generators import sample_case
+from src.geoshield.server.graders import GRADERS
 
 
 class GeoShieldEnvironment:
