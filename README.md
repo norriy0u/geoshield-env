@@ -11,7 +11,7 @@ tags:
 # 🛡️ GeoShield — Satellite Intelligence Triage Environment
 
 [![OpenEnv](https://img.shields.io/badge/OpenEnv-compliant-blue)](https://huggingface.co/spaces/norriy0u/geoshield-env)
-[![HuggingFace](https://img.shields.io/badge/🤗-HuggingFace%20Space-yellow)](https://huggingface.co/spaces/norriy0u/geoshield-env)
+[![HuggingFace](https://img.shields.io/badge/HF-HuggingFace%20Space-yellow)](https://huggingface.co/spaces/norriy0u/geoshield-env)
 [![Docker](https://img.shields.io/badge/Docker-ready-brightgreen)](./Dockerfile)
 
 ## Overview
@@ -93,6 +93,7 @@ Strategic Decision (ignore / classify / deploy)
 ---
 
 ### Task 3 — Multi-Zone Drone Allocation (Hard)
+- **Task 4** (Ultra): Covert Operation Detection � unmask facilities using civilian cover stories to hide weapons/military activity
 **Objective:** Receive simultaneous reports from 3 sectors, deploy ONE drone to the highest priority sector, and explain the strategic reasoning.
 
 | Field | Value |
@@ -367,6 +368,7 @@ Cases are designed so that:
 ## License
 
 MIT License — open for research and agent evaluation use.
+
 
 
 
