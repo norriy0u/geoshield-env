@@ -12,6 +12,34 @@ app = FastAPI(
     description="OpenEnv-compliant satellite intelligence triage environment for RL agent training.",
     version="2.0.0",
 )
+from fastapi import Request
+from fastapi.responses import JSONResponse
+import json
+
+def deep_clamp(obj):
+    if isinstance(obj, dict):
+        return {k: (round(max(0.01, min(0.99, float(v))), 4)
+                    if k in ("score","reward","total_score","final_score") and isinstance(v, (int,float))
+                    else deep_clamp(v))
+                for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [deep_clamp(i) for i in obj]
+    return obj
+
+@app.middleware("http")
+async def clamp_scores_middleware(request: Request, call_next):
+    response = await call_next(request)
+    if response.headers.get("content-type","").startswith("application/json"):
+        body = b""
+        async for chunk in response.body_iterator:
+            body += chunk
+        try:
+            data = json.loads(body)
+            data = deep_clamp(data)
+            return JSONResponse(content=data, status_code=response.status_code)
+        except Exception:
+            pass
+    return response
 
 app.add_middleware(
     CORSMiddleware,
