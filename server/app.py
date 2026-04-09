@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from typing import Optional, Dict, Any
 import uuid
 
-from environment import GeoShieldEnvironment
+from src.geoshield.server.environment import GeoShieldEnvironment
 
 app = FastAPI(
     title="GeoShield Environment API",
