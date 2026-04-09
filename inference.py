@@ -28,7 +28,7 @@ HF_TOKEN = os.getenv("HF_TOKEN") or os.getenv("API_KEY", "")
 ENV_URL = os.getenv("ENV_URL", "http://localhost:7860")
 
 BENCHMARK = "geoshield"
-MAX_STEPS = 8
+MAX_STEPS = 3
 TEMPERATURE = 0.2
 MAX_TOKENS = 512
 SUCCESS_THRESHOLD = 0.5
