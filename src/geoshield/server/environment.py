@@ -6,6 +6,13 @@ from src.geoshield.server.generators import sample_case
 from src.geoshield.server.graders import GRADERS
 
 
+def _clamp(score) -> float:
+    try:
+        return round(max(0.01, min(0.99, float(score))), 4)
+    except Exception:
+        return 0.01
+
+
 class GeoShieldEnvironment:
     def __init__(self):
         self.task_id: int = 1
@@ -57,7 +64,7 @@ class GeoShieldEnvironment:
             obs = self._build_observation()
             return {
                 "observation": obs.model_dump(),
-                "reward": 0.0,
+                "reward": 0.01,
                 "done": True,
                 "info": {"feedback": "Episode already completed."},
                 "session_id": None,
@@ -73,7 +80,7 @@ class GeoShieldEnvironment:
             self.investigation_results[action.action] = result
 
             obs = self._build_observation()
-            reward_val = 0.30 if action.action.replace("investigate_", "deploy_to_") == self.case.get("gold_action") else 0.10
+            reward_val = _clamp(0.30 if action.action.replace("investigate_", "deploy_to_") == self.case.get("gold_action") else 0.10)
 
             if self.step_count >= max_steps:
                 self.done = True
@@ -85,7 +92,7 @@ class GeoShieldEnvironment:
                 "info": {
                     "feedback": f"Investigation complete: {result}",
                     "step": self.step_count,
-                    "total_score": sum(self.rewards) + reward_val,
+                    "total_score": _clamp(sum(self.rewards) + reward_val),
                 },
             }
 
@@ -93,7 +100,7 @@ class GeoShieldEnvironment:
         if self.task_id == 4 and action.action == "request_verification":
             verification = self._handle_verification()
             obs = self._build_observation(extra_hint=verification)
-            reward_val = 0.35
+            reward_val = _clamp(0.35)
 
             if self.step_count >= max_steps:
                 self.done = True
@@ -106,7 +113,7 @@ class GeoShieldEnvironment:
                 "info": {
                     "feedback": f"Verification requested. Additional intel: {verification}",
                     "step": self.step_count,
-                    "total_score": sum(self.rewards),
+                    "total_score": _clamp(sum(self.rewards)),
                 },
             }
 
@@ -115,17 +122,17 @@ class GeoShieldEnvironment:
         if grader is None:
             raise ValueError(f"No grader for task {self.task_id}")
 
-   reward: GeoReward = grader(action, self.case)
-clamped = round(max(0.01, min(0.99, float(reward.score))), 4)
-reward.score = clamped
-self.rewards.append(clamped)
-self.total_score = round(max(0.01, min(0.99, sum(self.rewards) / len(self.rewards))), 4)
-self.done = True
+        reward: GeoReward = grader(action, self.case)
+        clamped = _clamp(reward.score)
+        reward.score = clamped
+        self.rewards.append(clamped)
+        self.total_score = _clamp(sum(self.rewards) / len(self.rewards))
+        self.done = True
 
         obs = self._build_observation()
         return {
             "observation": obs.model_dump(),
-            "reward": reward.score,
+            "reward": clamped,
             "done": True,
             "info": {
                 "feedback": reward.feedback,
@@ -151,7 +158,6 @@ self.done = True
 
         hint = extra_hint or case.get("hint", self._default_hint())
 
-        # Task 1 — simple report
         if task_id == 1:
             return GeoObservation(
                 task_id=task_id,
@@ -164,7 +170,6 @@ self.done = True
                 hint=hint,
             )
 
-        # Task 2 — report with threat context
         if task_id == 2:
             return GeoObservation(
                 task_id=task_id,
@@ -177,7 +182,6 @@ self.done = True
                 hint=hint,
             )
 
-        # Task 3 — multi-sector with investigation support
         if task_id == 3:
             sectors_raw = case.get("sectors", [])
             sectors = []
@@ -211,12 +215,11 @@ self.done = True
                 steps_remaining=max_steps - self.step_count,
             )
 
-        # Task 4 — covert operation detection
         if task_id == 4:
             indicators = case.get("deception_indicators", [])
             indicators_text = ""
             if indicators:
-                indicators_text = " Anomalies detected: " + "; ".join(indicators[:2])  # show only first 2 as hint
+                indicators_text = " Anomalies detected: " + "; ".join(indicators[:2])
 
             return GeoObservation(
                 task_id=task_id,
@@ -230,7 +233,6 @@ self.done = True
                 steps_remaining=max_steps - self.step_count,
             )
 
-        # Fallback
         return GeoObservation(
             task_id=task_id,
             case_id=self.case_id,
@@ -284,7 +286,6 @@ self.done = True
         indicators = self.case.get("deception_indicators", [])
         if not indicators:
             return "Secondary analysis confirms no suspicious activity. Facility appears legitimate."
-        # Reveal one more indicator not shown in the observation
         hidden = indicators[2:] if len(indicators) > 2 else indicators
         if hidden:
             return f"SIGINT confirms anomaly: {hidden[0]}. Classification confidence elevated."
