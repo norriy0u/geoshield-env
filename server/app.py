@@ -121,7 +121,9 @@ def list_tasks():
 
 
 @app.post("/reset")
-def reset(req: ResetRequest):
+def reset(req: Optional[ResetRequest] = None):
+    if req is None:
+        req = ResetRequest()
     session_id = req.session_id or str(uuid.uuid4())
     env = get_env(session_id)
     result = env.reset(
@@ -131,7 +133,6 @@ def reset(req: ResetRequest):
     )
     result["session_id"] = session_id
     return result
-
 
 @app.post("/step")
 def step(req: StepRequest):
