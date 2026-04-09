@@ -33,10 +33,13 @@ def get_env(session_id: str) -> GeoShieldEnvironment:
 # ── Request models ─────────────────────────────────────────────────────────────
 
 class ResetRequest(BaseModel):
-    task_id: int = 1
-    seed: int = 42
-    split: str = "train"
+    task_id: Optional[int] = 1
+    seed: Optional[int] = 42
+    split: Optional[str] = "train"
     session_id: Optional[str] = None
+
+    class Config:
+        extra = "allow"
 
 
 class StepRequest(BaseModel):
