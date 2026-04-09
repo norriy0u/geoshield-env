@@ -1,5 +1,14 @@
 ---
 title: GeoShield
+emoji: shield
+colorFrom: blue
+colorTo: green
+sdk: docker
+pinned: false
+---
+
+---
+title: GeoShield
 emoji: ???
 colorFrom: blue
 colorTo: green
@@ -365,4 +374,5 @@ Cases are designed so that:
 ## License
 
 MIT License — open for research and agent evaluation use.
+
 
