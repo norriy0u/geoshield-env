@@ -22,7 +22,7 @@ class GeoShieldEnvironment:
         self.step_count: int = 0
         self.done: bool = False
         self.rewards: list = []
-        self.total_score: float = 0.0
+        self.total_score: float = 0.01
         self.investigation_results: Dict[str, str] = {}
         self.drone_deployed: bool = False
         self.case_id: str = ""
@@ -36,7 +36,7 @@ class GeoShieldEnvironment:
         self.step_count = 0
         self.done = False
         self.rewards = []
-        self.total_score = 0.0
+        self.total_score = 0.01
         self.investigation_results = {}
         self.drone_deployed = False
 
