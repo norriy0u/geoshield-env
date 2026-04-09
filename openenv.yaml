@@ -1,0 +1,105 @@
+name: geoshield
+version: 1.0.0
+description: >
+  GeoShield is a satellite intelligence triage environment where an AI agent
+  acts as a Defense Zone Commander. The agent receives textual intelligence
+  reports (simulating output from a Vision-Language Model analyzing satellite
+  imagery) and must make strategic decisions: detecting false alarms,
+  classifying threats, and allocating reconnaissance assets across sectors.
+author: Ram Sathwik
+tags:
+  - openenv
+  - defense
+  - satellite
+  - intelligence
+  - classification
+  - resource-allocation
+  - real-world
+
+tasks:
+  - id: 1
+    name: false_alarm_detection
+    description: >
+      Classify satellite anomaly reports as ignore (false alarm) or
+      flag_for_review (real threat). Tests basic signal vs noise discrimination.
+    difficulty: easy
+    max_steps: 2
+    reward_range: [0.01, 0.99]
+    actions:
+      - ignore
+      - flag_for_review
+
+  - id: 2
+    name: threat_classification
+    description: >
+      Given a confirmed anomaly report, classify the threat type and assign
+      a severity level from 1 to 10. Partial credit is awarded for close
+      classifications and near-correct severity estimates.
+    difficulty: medium
+    max_steps: 3
+    reward_range: [0.01, 0.99]
+    actions:
+      - troop_movement
+      - illegal_construction
+      - unauthorized_aircraft
+      - weapons_cache
+      - civilian_activity
+
+  - id: 3
+    name: drone_allocation
+    description: >
+      Simultaneously evaluate intelligence reports from 3 sectors and deploy
+      a single reconnaissance drone to the highest priority sector. Agent must
+      provide strategic reasoning to earn full reward.
+    difficulty: hard
+    max_steps: 4
+    reward_range: [0.01, 0.99]
+    actions:
+      - deploy_to_sector_a
+      - deploy_to_sector_b
+      - deploy_to_sector_c
+
+observation_space:
+  type: object
+  fields:
+    task_id: integer
+    case_id: string
+    step: integer
+    difficulty: string
+    report: string
+    context: string
+    sectors: array
+    available_actions: array
+    available_assets: string
+    hint: string
+
+action_space:
+  type: object
+  fields:
+    action: string
+    threat_level: integer
+    target_sector: string
+    reasoning: string
+
+reward:
+  type: float
+  range: [0.01, 0.99]
+  description: >
+    Task 1 — Binary reward: 0.99 correct, 0.01 incorrect.
+    Task 2 — Partial: 0.5 classification score + 0.5 threat level proximity.
+    Task 3 — Partial: 0.5 sector selection + 0.5 reasoning quality score.
+
+api:
+  base_url: http://localhost:7860
+  endpoints:
+    reset: POST /reset
+    step: POST /step
+    state: POST /state
+    info: GET /info
+    health: GET /health
+
+runtime:
+  framework: fastapi
+  python: "3.11"
+  port: 7860
+  dockerfile: Dockerfile
