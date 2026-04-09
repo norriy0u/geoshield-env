@@ -12,7 +12,7 @@ import time
 import requests
 from openai import OpenAI
 
-# ── Config ─────────────────────────────────────────────────────────────────────
+#── Config ─────────────────────────────────────────────────────────────────────
 API_BASE_URL = os.getenv("API_BASE_URL", "https://api-inference.huggingface.co/models/Qwen/Qwen2.5-72B-Instruct/v1")
 MODEL_NAME   = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-72B-Instruct")
 HF_TOKEN     = os.getenv("HF_TOKEN") or os.getenv("OPENAI_API_KEY") or os.getenv("API_KEY", "")
@@ -102,7 +102,7 @@ def call_llm(user_prompt: str) -> dict:
     except json.JSONDecodeError:
         return {"action": "ignore", "reasoning": "parse error"}
     except Exception as e:
-        print(f"[LLM ERROR] {e}", file=sys.stderr)
+        print(f"[LLM ERROR] {e}", file=sys.stderr, flush=True)
         return {"action": "ignore", "reasoning": str(e)}
 
 
@@ -130,14 +130,7 @@ def run_episode(task_id: int, seed: int = SEED) -> float:
     case_id      = reset_data["info"]["case_id"]
     difficulty   = reset_data["info"]["difficulty"]
 
-    print(json.dumps({
-        "event":      "[START]",
-        "task_id":    task_id,
-        "case_id":    case_id,
-        "session_id": session_id,
-        "difficulty": difficulty,
-        "seed":       seed,
-    }))
+    print(f"[START] task={task_id} case={case_id} difficulty={difficulty} seed={seed}", flush=True)
 
     total_reward = 0.0
     done         = False
@@ -148,33 +141,19 @@ def run_episode(task_id: int, seed: int = SEED) -> float:
         user_prompt = build_user_prompt(obs)
         action      = call_llm(user_prompt)
 
-        step_data = env_step(session_id, action)
-        reward    = step_data.get("reward", 0.0)
-        done      = step_data.get("done", True)
-        info      = step_data.get("info", {})
-        obs       = step_data.get("observation", obs)
+        step_data    = env_step(session_id, action)
+        reward       = step_data.get("reward", 0.0)
+        done         = step_data.get("done", True)
+        info         = step_data.get("info", {})
+        obs          = step_data.get("observation", obs)
         total_reward = info.get("total_score", reward)
 
-        print(json.dumps({
-            "event":    "[STEP]",
-            "task_id":  task_id,
-            "step":     step_num,
-            "action":   action,
-            "reward":   reward,
-            "done":     done,
-            "feedback": info.get("feedback", ""),
-        }))
+        print(f"[STEP] task={task_id} step={step_num} action={action.get('action','')} reward={reward} done={done}", flush=True)
 
         if not done:
             time.sleep(0.5)
 
-    print(json.dumps({
-        "event":        "[END]",
-        "task_id":      task_id,
-        "case_id":      case_id,
-        "total_reward": total_reward,
-        "steps":        step_num,
-    }))
+    print(f"[END] task={task_id} case={case_id} score={total_reward} steps={step_num}", flush=True)
 
     return total_reward
 
@@ -182,13 +161,7 @@ def run_episode(task_id: int, seed: int = SEED) -> float:
 # ── Main ───────────────────────────────────────────────────────────────────────
 
 def main():
-    print(json.dumps({
-        "event":   "[START]",
-        "run":     "geoshield_baseline",
-        "model":   MODEL_NAME,
-        "env_url": ENV_URL,
-        "tasks":   TASKS,
-    }))
+    print(f"[START] run=geoshield_baseline model={MODEL_NAME} tasks={TASKS}", flush=True)
 
     results = {}
     for task_id in TASKS:
@@ -196,19 +169,14 @@ def main():
             score = run_episode(task_id, seed=SEED)
             results[f"task_{task_id}"] = round(score, 4)
         except Exception as e:
-            print(f"[ERROR] Task {task_id} failed: {e}", file=sys.stderr)
+            print(f"[ERROR] task={task_id} error={e}", file=sys.stderr, flush=True)
             results[f"task_{task_id}"] = 0.0
         time.sleep(1)
 
     overall = round(sum(results.values()) / len(results), 4)
     results["overall"] = overall
 
-    print(json.dumps({
-        "event":   "[END]",
-        "run":     "geoshield_baseline",
-        "results": results,
-        "status":  "complete",
-    }))
+    print(f"[END] run=geoshield_baseline score={overall} results={json.dumps(results)}", flush=True)
 
 
 if __name__ == "__main__":
