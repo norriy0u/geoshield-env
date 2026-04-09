@@ -95,7 +95,7 @@ def grade_task3(action: GeoShieldAction, case: Dict[str, Any]) -> GeoReward:
     return GeoReward(
         score=final,
         feedback=f"Sector: {'correct' if sector_score > 0.5 else 'incorrect'} (expected '{gold_action}'). Reasoning: {len(reasoning)} chars, {keyword_hits} keywords.",
-        breakdown={"sector_score": sector_score, "reasoning_score": reasoning_score, "keyword_hits": keyword_hits, "final_score": final}
+        breakdown={"sector_score": sector_score, "reasoning_score": reasoning_score, "final_score": final}
     )
 
 
