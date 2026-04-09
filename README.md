@@ -1,4 +1,4 @@
----
+﻿---
 title: GeoShield
 colorFrom: blue
 colorTo: green
@@ -93,7 +93,7 @@ Strategic Decision (ignore / classify / deploy)
 ---
 
 ### Task 3 — Multi-Zone Drone Allocation (Hard)
-- **Task 4** (Ultra): Covert Operation Detection � unmask facilities using civilian cover stories to hide weapons/military activity
+- **Task 4** (Ultra): Covert Operation Detection � unmask facilities using civilian cover stories to hide weapons/military activity
 **Objective:** Receive simultaneous reports from 3 sectors, deploy ONE drone to the highest priority sector, and explain the strategic reasoning.
 
 | Field | Value |
