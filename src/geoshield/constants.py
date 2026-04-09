@@ -1,19 +1,35 @@
 TASK_ACTIONS = {
     1: ["ignore", "flag_for_review"],
     2: ["troop_movement", "illegal_construction", "unauthorized_aircraft", "weapons_cache", "civilian_activity"],
-    3: ["deploy_to_sector_a", "deploy_to_sector_b", "deploy_to_sector_c"],
+    3: ["deploy_to_sector_a", "deploy_to_sector_b", "deploy_to_sector_c",
+        "investigate_sector_a", "investigate_sector_b", "investigate_sector_c"],
+    4: ["covert_operation", "legitimate_activity", "request_verification"],
 }
 
-TASK_DESCRIPTIONS = {
-    1: "False Alarm vs Real Threat — classify satellite report as ignore or flag_for_review",
-    2: "Threat Classification & Severity — classify anomaly type and assign threat level 1-10",
-    3: "Multi-Zone Drone Allocation — deploy one reconnaissance drone to highest priority sector",
+MAX_STEPS = {
+    1: 2,
+    2: 3,
+    3: 6,
+    4: 4,
 }
 
 TASK_NAMES = {
     1: "false_alarm_detection",
     2: "threat_classification",
     3: "drone_allocation",
+    4: "covert_operation_detection",
 }
 
-MAX_STEPS = {1: 2, 2: 3, 3: 4}
+DIFFICULTY_WEIGHTS = {
+    "easy": 1.0,
+    "medium": 1.5,
+    "hard": 2.0,
+    "ultra": 3.0,
+}
+
+STRATEGIC_KEYWORDS = [
+    "threat", "priority", "risk", "intelligence", "reconnaissance",
+    "confirm", "verify", "assess", "sector", "deploy", "critical",
+    "immediate", "strategic", "tactical", "covert", "deception",
+    "cover", "legitimate", "suspicious", "anomaly", "pattern",
+]

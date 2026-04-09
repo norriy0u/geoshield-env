@@ -1,195 +1,187 @@
-import sys
-sys.path.insert(0, '/app')
-sys.path.insert(0, '/app/src/geoshield')
-
-import uuid
-import time
+import random
 from typing import Dict, Any, Optional
-
-from src.geoshield.models import GeoShieldAction, GeoObservation, GeoReward, GeoState, SectorReport
-from src.geoshield.constants import TASK_ACTIONS, MAX_STEPS
+from src.geoshield.models import GeoObservation, GeoShieldAction, GeoReward, GeoState, SectorReport
+from src.geoshield.constants import TASK_ACTIONS, MAX_STEPS, TASK_NAMES
 from src.geoshield.server.generators import sample_case
 from src.geoshield.server.graders import GRADERS
 
 
 class GeoShieldEnvironment:
     def __init__(self):
-        self.state: Optional[GeoState] = None
-        self.current_case: Optional[Dict[str, Any]] = None
         self.task_id: int = 1
+        self.seed: int = 42
         self.split: str = "train"
+        self.case: Dict[str, Any] = {}
+        self.step_count: int = 0
+        self.done: bool = False
+        self.rewards: list = []
+        self.total_score: float = 0.0
+        self.investigation_results: Dict[str, str] = {}
+        self.drone_deployed: bool = False
+        self.case_id: str = ""
 
-    # ── reset ────────────────────────────────────────────────────────────────
+    # ── reset ──────────────────────────────────────────────────────────────────
 
-    def reset(self, task_id: int = 1, seed: int = None, split: str = "train") -> Dict[str, Any]:
+    def reset(self, task_id: int = 1, seed: int = 42, split: str = "train") -> Dict[str, Any]:
         self.task_id = task_id
+        self.seed = seed
         self.split = split
+        self.step_count = 0
+        self.done = False
+        self.rewards = []
+        self.total_score = 0.0
+        self.investigation_results = {}
+        self.drone_deployed = False
 
-        if seed is None:
-            seed = int(time.time() * 1000) % 100000
-
-        self.current_case = sample_case(task_id, seed=seed, split=split)
-
-        case_id = self.current_case.get("id", str(uuid.uuid4()))
-        difficulty = self.current_case.get("difficulty", "easy")
-
-        self.state = GeoState(
-            task_id=task_id,
-            case_id=case_id,
-            completed=False,
-            step=0,
-            rewards=[],
-            total_score=0.0,
-            difficulty=difficulty,
-        )
+        self.case = sample_case(task_id, seed, split)
+        self.case_id = self.case.get("id", f"t{task_id}_unknown")
 
         obs = self._build_observation()
-        self.state.current_observation = str(obs.dict())
-
         return {
-            "observation": obs.dict(),
-            "state": self.state.dict(),
+            "observation": obs.model_dump(),
+            "state": self._build_state().model_dump(),
             "done": False,
             "info": {
-                "task_id": task_id,
-                "case_id": case_id,
-                "difficulty": difficulty,
+                "task_id": self.task_id,
+                "case_id": self.case_id,
+                "difficulty": self.case.get("difficulty", "easy"),
                 "split": split,
                 "seed": seed,
             }
         }
 
-    # ── step ─────────────────────────────────────────────────────────────────
+    # ── step ───────────────────────────────────────────────────────────────────
 
-    def step(self, action_data: Dict[str, Any]) -> Dict[str, Any]:
-        if self.state is None or self.current_case is None:
-            return self._error_response("Environment not initialized. Call reset() first.")
-
-        if self.state.completed:
-            return self._error_response("Episode already completed. Call reset() to start a new episode.")
-
-        # Parse action
-        try:
-            action = GeoShieldAction(**action_data)
-        except Exception as e:
-            return self._error_response(f"Invalid action format: {str(e)}")
-
-        # Validate action
-        valid_actions = TASK_ACTIONS.get(self.task_id, [])
-        if action.action not in valid_actions:
-            # Soft penalty — don't crash, just penalize
-            reward = GeoReward(
-                score=0.01,
-                feedback=f"Invalid action '{action.action}'. Valid actions: {valid_actions}",
-                breakdown={"error": "invalid_action"}
-            )
-            self.state.step += 1
-            self.state.rewards.append(reward.score)
-            self.state.total_score = sum(self.state.rewards) / len(self.state.rewards)
-
-            done = self.state.step >= MAX_STEPS.get(self.task_id, 2)
-            if done:
-                self.state.completed = True
-
+    def step(self, action_input: Dict[str, Any]) -> Dict[str, Any]:
+        if self.done:
+            obs = self._build_observation()
             return {
-                "observation": self._build_observation().dict(),
-                "reward": reward.score,
-                "done": done,
-                "info": {
-                    "feedback": reward.feedback,
-                    "breakdown": reward.breakdown,
-                    "step": self.state.step,
-                    "total_score": self.state.total_score,
-                }
+                "observation": obs.model_dump(),
+                "reward": 0.0,
+                "done": True,
+                "info": {"feedback": "Episode already completed."},
+                "session_id": None,
             }
 
-        # Grade action
+        action = GeoShieldAction(**action_input) if isinstance(action_input, dict) else action_input
+        self.step_count += 1
+        max_steps = MAX_STEPS.get(self.task_id, 3)
+
+        # ── Task 3: handle investigate actions (multi-turn) ───────────────────
+        if self.task_id == 3 and action.action.startswith("investigate_"):
+            result = self._handle_investigation(action.action)
+            self.investigation_results[action.action] = result
+
+            obs = self._build_observation()
+            reward_val = 0.30 if action.action.replace("investigate_", "deploy_to_") == self.case.get("gold_action") else 0.10
+
+            if self.step_count >= max_steps:
+                self.done = True
+
+            return {
+                "observation": obs.model_dump(),
+                "reward": reward_val,
+                "done": self.done,
+                "info": {
+                    "feedback": f"Investigation complete: {result}",
+                    "step": self.step_count,
+                    "total_score": sum(self.rewards) + reward_val,
+                },
+            }
+
+        # ── Task 4: handle request_verification ───────────────────────────────
+        if self.task_id == 4 and action.action == "request_verification":
+            verification = self._handle_verification()
+            obs = self._build_observation(extra_hint=verification)
+            reward_val = 0.35
+
+            if self.step_count >= max_steps:
+                self.done = True
+
+            self.rewards.append(reward_val)
+            return {
+                "observation": obs.model_dump(),
+                "reward": reward_val,
+                "done": self.done,
+                "info": {
+                    "feedback": f"Verification requested. Additional intel: {verification}",
+                    "step": self.step_count,
+                    "total_score": sum(self.rewards),
+                },
+            }
+
+        # ── Standard graded step ──────────────────────────────────────────────
         grader = GRADERS.get(self.task_id)
         if grader is None:
-            return self._error_response(f"No grader found for task {self.task_id}")
+            raise ValueError(f"No grader for task {self.task_id}")
 
-        reward = grader(action, self.current_case)
-
-        # Update state
-        self.state.step += 1
-        self.state.rewards.append(reward.score)
-        self.state.total_score = sum(self.state.rewards) / len(self.state.rewards)
-
-        # Step penalty for excessive steps
-        max_steps = MAX_STEPS.get(self.task_id, 2)
-        if self.state.step >= max_steps:
-            self.state.completed = True
-            done = True
-        else:
-            done = reward.score >= 0.8  # early termination on high score
-            if done:
-                self.state.completed = True
+        reward: GeoReward = grader(action, self.case)
+        self.rewards.append(reward.score)
+        self.total_score = round(sum(self.rewards) / len(self.rewards), 4)
+        self.done = True
 
         obs = self._build_observation()
-        self.state.current_observation = str(obs.dict())
-
         return {
-            "observation": obs.dict(),
+            "observation": obs.model_dump(),
             "reward": reward.score,
-            "done": done,
+            "done": True,
             "info": {
                 "feedback": reward.feedback,
                 "breakdown": reward.breakdown,
-                "step": self.state.step,
-                "total_score": self.state.total_score,
-                "completed": self.state.completed,
-            }
+                "step": self.step_count,
+                "total_score": self.total_score,
+                "completed": True,
+            },
         }
 
-    # ── state ─────────────────────────────────────────────────────────────────
+    # ── state ──────────────────────────────────────────────────────────────────
 
-    def get_state(self) -> Dict[str, Any]:
-        if self.state is None:
-            return {"error": "Environment not initialized. Call reset() first."}
-        return self.state.dict()
+    def state(self) -> Dict[str, Any]:
+        return self._build_state().model_dump()
 
-    # ── helpers ───────────────────────────────────────────────────────────────
+    # ── internal helpers ───────────────────────────────────────────────────────
 
-    def _build_observation(self) -> GeoObservation:
-        case = self.current_case
+    def _build_observation(self, extra_hint: Optional[str] = None) -> GeoObservation:
         task_id = self.task_id
-        step = self.state.step if self.state else 0
-        difficulty = case.get("difficulty", "easy")
-        available_actions = TASK_ACTIONS.get(task_id, [])
+        case = self.case
+        actions = TASK_ACTIONS.get(task_id, [])
+        max_steps = MAX_STEPS.get(task_id, 3)
 
+        hint = extra_hint or case.get("hint", self._default_hint())
+
+        # Task 1 — simple report
         if task_id == 1:
             return GeoObservation(
                 task_id=task_id,
-                case_id=case.get("id", "unknown"),
-                step=step,
-                difficulty=difficulty,
+                case_id=self.case_id,
+                step=self.step_count,
+                difficulty=case.get("difficulty", "easy"),
                 report=case.get("report", ""),
                 context=case.get("context", ""),
-                available_actions=available_actions,
-                hint="Classify this satellite report as 'ignore' or 'flag_for_review'.",
+                available_actions=actions,
+                hint=hint,
             )
 
-        elif task_id == 2:
+        # Task 2 — report with threat context
+        if task_id == 2:
             return GeoObservation(
                 task_id=task_id,
-                case_id=case.get("id", "unknown"),
-                step=step,
-                difficulty=difficulty,
+                case_id=self.case_id,
+                step=self.step_count,
+                difficulty=case.get("difficulty", "medium"),
                 report=case.get("report", ""),
                 context=case.get("context", ""),
-                available_actions=available_actions,
-                hint=(
-                    "Classify the anomaly type and set threat_level (1-10). "
-                    "Actions: troop_movement, illegal_construction, unauthorized_aircraft, weapons_cache, civilian_activity."
-                ),
+                available_actions=actions,
+                hint=hint,
             )
 
-        elif task_id == 3:
-            raw_sectors = case.get("sectors", [])
+        # Task 3 — multi-sector with investigation support
+        if task_id == 3:
+            sectors_raw = case.get("sectors", [])
             sectors = []
-            for s in raw_sectors:
+            for s in sectors_raw:
                 sectors.append(SectorReport(
-                    sector_id=s.get("sector_id", "unknown"),
+                    sector_id=s.get("sector_id", ""),
                     summary=s.get("summary", ""),
                     anomaly_type=s.get("anomaly_type"),
                     confidence=s.get("confidence", 0.0),
@@ -197,33 +189,101 @@ class GeoShieldEnvironment:
                     timestamp=s.get("timestamp", "00:00Z"),
                 ))
 
+            inv_hint = ""
+            if self.investigation_results:
+                inv_hint = " | Investigations: " + "; ".join(
+                    f"{k.replace('investigate_', '').upper()}: {v}"
+                    for k, v in self.investigation_results.items()
+                )
+
             return GeoObservation(
                 task_id=task_id,
-                case_id=case.get("id", "unknown"),
-                step=step,
-                difficulty=difficulty,
+                case_id=self.case_id,
+                step=self.step_count,
+                difficulty=case.get("difficulty", "hard"),
                 sectors=sectors,
-                available_actions=available_actions,
-                available_assets=case.get("available_assets", "1 reconnaissance drone"),
-                hint=(
-                    "Deploy your ONE drone to the highest priority sector. "
-                    "Set target_sector to your chosen sector id and provide strategic reasoning."
-                ),
+                available_actions=actions,
+                available_assets=case.get("available_assets", "1 surveillance drone"),
+                hint=hint + inv_hint,
+                investigation_results=self.investigation_results if self.investigation_results else None,
+                steps_remaining=max_steps - self.step_count,
             )
 
-        # fallback
+        # Task 4 — covert operation detection
+        if task_id == 4:
+            indicators = case.get("deception_indicators", [])
+            indicators_text = ""
+            if indicators:
+                indicators_text = " Anomalies detected: " + "; ".join(indicators[:2])  # show only first 2 as hint
+
+            return GeoObservation(
+                task_id=task_id,
+                case_id=self.case_id,
+                step=self.step_count,
+                difficulty=case.get("difficulty", "hard"),
+                report=case.get("report", "") + indicators_text,
+                context=case.get("context", ""),
+                available_actions=actions,
+                hint=hint,
+                steps_remaining=max_steps - self.step_count,
+            )
+
+        # Fallback
         return GeoObservation(
             task_id=task_id,
-            case_id=case.get("id", "unknown"),
-            step=step,
-            difficulty=difficulty,
-            available_actions=available_actions,
+            case_id=self.case_id,
+            step=self.step_count,
+            difficulty="easy",
+            report=case.get("report", ""),
+            available_actions=actions,
         )
 
-    def _error_response(self, message: str) -> Dict[str, Any]:
-        return {
-            "observation": None,
-            "reward": 0.0,
-            "done": True,
-            "info": {"error": message}
+    def _build_state(self) -> GeoState:
+        return GeoState(
+            task_id=self.task_id,
+            case_id=self.case_id,
+            completed=self.done,
+            step=self.step_count,
+            rewards=self.rewards,
+            total_score=self.total_score,
+            difficulty=self.case.get("difficulty", "easy"),
+            current_observation=str(self._build_observation().model_dump()),
+            investigation_used=bool(self.investigation_results),
+            drone_deployed=self.drone_deployed,
+        )
+
+    def _default_hint(self) -> str:
+        hints = {
+            1: "Classify this satellite report as 'ignore' or 'flag_for_review'.",
+            2: "Identify the threat type and rate its severity (1-10).",
+            3: "Analyze all sectors and deploy your drone to the highest priority threat. You may investigate one sector first.",
+            4: "Determine if this facility is a covert operation or legitimate activity. Identify the cover story and deception type if applicable.",
         }
+        return hints.get(self.task_id, "Analyze and respond.")
+
+    def _handle_investigation(self, action: str) -> str:
+        sector = action.replace("investigate_", "").upper()
+        sectors_raw = self.case.get("sectors", [])
+        gold_action = self.case.get("gold_action", "")
+        gold_sector = gold_action.replace("deploy_to_", "").upper()
+
+        for s in sectors_raw:
+            if s.get("sector_id", "").upper() == sector:
+                anomaly = s.get("anomaly_type", "no anomaly")
+                confidence = s.get("confidence", 0.0)
+                if sector == gold_sector:
+                    return f"PRIORITY CONFIRMED — {anomaly} detected, confidence {confidence:.0%}. Immediate drone deployment recommended."
+                else:
+                    return f"Low priority — {anomaly or 'no significant activity'}, confidence {confidence:.0%}. Consider other sectors."
+
+        return f"Sector {sector}: No detailed data available."
+
+    def _handle_verification(self) -> str:
+        indicators = self.case.get("deception_indicators", [])
+        if not indicators:
+            return "Secondary analysis confirms no suspicious activity. Facility appears legitimate."
+        # Reveal one more indicator not shown in the observation
+        hidden = indicators[2:] if len(indicators) > 2 else indicators
+        if hidden:
+            return f"SIGINT confirms anomaly: {hidden[0]}. Classification confidence elevated."
+        return "Additional analysis inconclusive. Proceed with available evidence."

@@ -1,370 +1,215 @@
+#!/usr/bin/env python3
 """
-GeoShield — Inference Script
-Runs an LLM agent against all 3 GeoShield tasks and emits structured stdout logs.
-
-Required env vars:
-    API_BASE_URL   The API endpoint for the LLM
-    MODEL_NAME     The model identifier
-    HF_TOKEN       Your Hugging Face / API key
-
-Stdout format (mandatory):
-    [START] task=<task_name> env=geoshield model=<model_name>
-    [STEP]  step=<n> action=<action_str> reward=<0.00> done=<true|false> error=<msg|null>
-    [END]   success=<true|false> steps=<n> score=<score> rewards=<r1,r2,...>
+GeoShield Inference Script
+OpenEnv-compliant baseline using OpenAI client.
+Emits structured [START], [STEP], [END] logs to stdout.
 """
 
 import os
+import sys
 import json
 import time
 import requests
-from typing import List, Optional
 from openai import OpenAI
 
-# ── Config ────────────────────────────────────────────────────────────────────
+# ── Config ─────────────────────────────────────────────────────────────────────
+API_BASE_URL = os.getenv("API_BASE_URL", "https://api-inference.huggingface.co/models/Qwen/Qwen2.5-72B-Instruct/v1")
+MODEL_NAME   = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-72B-Instruct")
+HF_TOKEN     = os.getenv("HF_TOKEN") or os.getenv("OPENAI_API_KEY") or os.getenv("API_KEY", "")
+ENV_URL      = os.getenv("ENV_URL", "https://norriy0u-geoshield-env.hf.space")
 
-API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
-MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-72B-Instruct")
-HF_TOKEN = os.getenv("HF_TOKEN") or os.getenv("OPENAI_API_KEY") or os.getenv("API_KEY", "")
-ENV_URL = os.getenv("ENV_URL", "http://localhost:7860")
-
-BENCHMARK = "geoshield"
 MAX_STEPS = 3
-TEMPERATURE = 0.2
-MAX_TOKENS = 512
-SUCCESS_THRESHOLD = 0.5
+TASKS     = [1, 2, 3, 4]
+SEED      = 42
 
-TASK_NAMES = {
-    1: "false_alarm_detection",
-    2: "threat_classification",
-    3: "drone_allocation",
-}
+client = OpenAI(
+    base_url=API_BASE_URL,
+    api_key=HF_TOKEN,
+)
 
-# ── Logging ───────────────────────────────────────────────────────────────────
+# ── Prompts ────────────────────────────────────────────────────────────────────
 
-def log_start(task: str, model: str) -> None:
-    print(f"[START] task={task} env={BENCHMARK} model={model}", flush=True)
+SYSTEM_PROMPT = """You are a satellite intelligence analyst. You will receive
+intelligence reports and must respond with precise JSON actions.
 
-def log_step(step: int, action: str, reward: float, done: bool, error: Optional[str]) -> None:
-    error_val = error if error else "null"
-    done_val = str(done).lower()
-    # clean action string — no spaces or newlines
-    action_clean = action.replace("\n", " ").replace("\r", "").strip()[:80]
-    print(
-        f"[STEP] step={step} action={action_clean} reward={reward:.2f} done={done_val} error={error_val}",
-        flush=True,
-    )
+For Task 1 (false alarm detection):
+  {"action": "ignore"} or {"action": "flag_for_review"}
 
-def log_end(success: bool, steps: int, score: float, rewards: List[float]) -> None:
-    rewards_str = ",".join(f"{r:.2f}" for r in rewards)
-    print(
-        f"[END] success={str(success).lower()} steps={steps} score={score:.3f} rewards={rewards_str}",
-        flush=True,
-    )
+For Task 2 (threat classification):
+  {"action": "<threat_type>", "threat_level": <1-10>}
+  threat types: troop_movement, illegal_construction, unauthorized_aircraft, weapons_cache, civilian_activity
 
-# ── Environment client ────────────────────────────────────────────────────────
+For Task 3 (drone allocation):
+  {"action": "deploy_to_sector_a|b|c"} or {"action": "investigate_sector_a|b|c"}
+  Include: {"reasoning": "<your strategic analysis>"}
 
-def env_reset(task_id: int, seed: int = 42) -> dict:
-    resp = requests.post(
-        f"{ENV_URL}/reset",
-        json={"task_id": task_id, "seed": seed, "split": "eval"},
-        timeout=30,
-    )
-    resp.raise_for_status()
-    return resp.json()
+For Task 4 (covert operation detection):
+  {"action": "covert_operation|legitimate_activity|request_verification",
+   "cover_story_identified": "<the civilian cover being used>",
+   "deception_type": "<one of: civilian_military|commercial_weapons|construction_fortification|logistics_supply|research_weapons>",
+   "reasoning": "<your analysis of the deception indicators>"}
 
-def env_step(action_data: dict, session_id: str) -> dict:
-    action_data["session_id"] = session_id
-    resp = requests.post(
-        f"{ENV_URL}/step",
-        json=action_data,
-        timeout=30,
-    )
-    resp.raise_for_status()
-    return resp.json()
+Always respond with valid JSON only. No explanation outside the JSON."""
 
-# ── Prompts ───────────────────────────────────────────────────────────────────
 
-SYSTEM_PROMPT_T1 = """You are a Defense Zone Commander AI analyzing satellite intelligence reports.
+def build_user_prompt(obs: dict) -> str:
+    task_id = obs.get("task_id", 1)
+    lines = [f"TASK {task_id} | Case: {obs.get('case_id')} | Step: {obs.get('step')} | Difficulty: {obs.get('difficulty')}"]
 
-Your task: Classify each report as a FALSE ALARM or REAL THREAT.
+    if obs.get("report"):
+        lines.append(f"\nREPORT:\n{obs['report']}")
 
-Output ONLY a JSON object with this exact format:
-{"action": "ignore"}
-or
-{"action": "flag_for_review"}
+    if obs.get("context"):
+        lines.append(f"\nCONTEXT: {obs['context']}")
 
-Rules:
-- "ignore" = false alarm (wildlife, weather, registered civilian activity, valid permits)
-- "flag_for_review" = real threat (unregistered convoys, illegal construction, suspicious activity)
-- Output ONLY the JSON. No explanation. No markdown. No extra text."""
+    if obs.get("sectors"):
+        lines.append("\nSECTOR REPORTS:")
+        for s in obs["sectors"]:
+            if isinstance(s, dict):
+                lines.append(f"  [{s.get('sector_id','?').upper()}] {s.get('summary','')} | Anomaly: {s.get('anomaly_type','none')} | Confidence: {s.get('confidence',0):.0%}")
 
-SYSTEM_PROMPT_T2 = """You are a Defense Zone Commander AI analyzing confirmed anomaly reports.
+    if obs.get("investigation_results"):
+        lines.append("\nINVESTIGATION RESULTS:")
+        for k, v in obs["investigation_results"].items():
+            lines.append(f"  {k}: {v}")
 
-Your task: Classify the threat type AND assign a severity level 1-10.
+    if obs.get("steps_remaining") is not None:
+        lines.append(f"\nSteps remaining: {obs['steps_remaining']}")
 
-Output ONLY a JSON object with this exact format:
-{"action": "troop_movement", "threat_level": 8}
+    lines.append(f"\nAvailable actions: {obs.get('available_actions', [])}")
+    lines.append(f"\nHint: {obs.get('hint', '')}")
+    lines.append("\nRespond with JSON only.")
 
-Valid action values:
-- "troop_movement" — military personnel or vehicles moving
-- "illegal_construction" — unauthorized building, bunkers, tunnels, airstrips
-- "unauthorized_aircraft" — unregistered drones, planes, balloons
-- "weapons_cache" — hidden weapons, ammunition, explosives
-- "civilian_activity" — confirmed non-threatening civilian activity
+    return "\n".join(lines)
 
-Threat level guide:
-1-2: No real threat (civilian)
-3-4: Minor concern
-5-6: Moderate threat, needs monitoring
-7-8: Serious threat, immediate attention
-9-10: Critical threat, imminent danger
 
-Output ONLY the JSON. No explanation. No markdown. No extra text."""
+# ── LLM call ───────────────────────────────────────────────────────────────────
 
-SYSTEM_PROMPT_T3 = """You are a Defense Zone Commander AI with ONE reconnaissance drone to deploy.
-
-Your task: Analyze 3 simultaneous sector reports and deploy the drone to the HIGHEST PRIORITY sector.
-
-Output ONLY a JSON object with this exact format:
-{"action": "deploy_to_sector_b", "target_sector": "sector_b", "reasoning": "Sector B has an unregistered armored convoy indicating imminent military threat requiring immediate reconnaissance before the window closes."}
-
-Valid action values:
-- "deploy_to_sector_a"
-- "deploy_to_sector_b"  
-- "deploy_to_sector_c"
-
-Priority rules (highest to lowest):
-1. Active military movement (troop_movement with high confidence)
-2. Weapons cache or explosive threat
-3. Illegal construction with strategic value (bunkers, missile sites, tunnels)
-4. Unauthorized aircraft over critical infrastructure
-5. Illegal construction (general)
-6. Civilian activity (lowest priority)
-
-The "reasoning" field must be at least 100 words explaining your strategic decision.
-Output ONLY the JSON. No explanation outside JSON. No markdown."""
-
-SYSTEM_PROMPTS = {
-    1: SYSTEM_PROMPT_T1,
-    2: SYSTEM_PROMPT_T2,
-    3: SYSTEM_PROMPT_T3,
-}
-
-# ── Observation formatter ─────────────────────────────────────────────────────
-
-def format_observation(obs: dict, task_id: int) -> str:
-    if task_id == 1:
-        return (
-            f"SATELLITE INTELLIGENCE REPORT\n"
-            f"{'='*50}\n"
-            f"Report: {obs.get('report', 'N/A')}\n"
-            f"Context: {obs.get('context', 'N/A')}\n"
-            f"Difficulty: {obs.get('difficulty', 'N/A')}\n"
-            f"{'='*50}\n"
-            f"Classify as: ignore OR flag_for_review"
-        )
-    elif task_id == 2:
-        return (
-            f"CONFIRMED ANOMALY REPORT\n"
-            f"{'='*50}\n"
-            f"Report: {obs.get('report', 'N/A')}\n"
-            f"Context: {obs.get('context', 'N/A')}\n"
-            f"Difficulty: {obs.get('difficulty', 'N/A')}\n"
-            f"{'='*50}\n"
-            f"Classify threat type and assign severity 1-10."
-        )
-    elif task_id == 3:
-        sectors = obs.get("sectors", [])
-        sector_text = ""
-        for s in sectors:
-            sector_text += (
-                f"\n  [{s.get('sector_id', '?').upper()}]\n"
-                f"  Summary: {s.get('summary', 'N/A')}\n"
-                f"  Anomaly Type: {s.get('anomaly_type', 'unknown')}\n"
-                f"  Confidence: {s.get('confidence', 0):.0%}\n"
-                f"  Coordinates: {s.get('coordinates', 'N/A')}\n"
-                f"  Timestamp: {s.get('timestamp', 'N/A')}\n"
-            )
-        return (
-            f"MULTI-SECTOR INTELLIGENCE BRIEFING\n"
-            f"{'='*50}\n"
-            f"Available Assets: {obs.get('available_assets', '1 reconnaissance drone')}\n"
-            f"SECTOR REPORTS:{sector_text}"
-            f"{'='*50}\n"
-            f"Deploy your ONE drone to the highest priority sector."
-        )
-    return str(obs)
-
-# ── Action parser ─────────────────────────────────────────────────────────────
-
-def parse_action(text: str, task_id: int) -> dict:
-    """Parse LLM output into action dict. Handles messy JSON."""
-    text = text.strip()
-
-    # Strip markdown fences
-    if "```" in text:
-        lines = text.split("\n")
-        lines = [l for l in lines if not l.strip().startswith("```")]
-        text = "\n".join(lines).strip()
-
-    # Find JSON object
-    start = text.find("{")
-    end = text.rfind("}") + 1
-    if start != -1 and end > start:
-        text = text[start:end]
-
+def call_llm(user_prompt: str) -> dict:
     try:
-        data = json.loads(text)
-    except Exception:
-        # Fallback defaults
-        if task_id == 1:
-            return {"action": "ignore"}
-        elif task_id == 2:
-            return {"action": "civilian_activity", "threat_level": 1}
-        else:
-            return {
-                "action": "deploy_to_sector_a",
-                "target_sector": "sector_a",
-                "reasoning": "Defaulting to sector_a due to parse error.",
-            }
-
-    # Ensure required fields
-    if task_id == 2 and "threat_level" not in data:
-        data["threat_level"] = 5
-    if task_id == 3:
-        if "target_sector" not in data:
-            action = data.get("action", "deploy_to_sector_a")
-            data["target_sector"] = action.replace("deploy_to_", "")
-        if "reasoning" not in data:
-            data["reasoning"] = "No reasoning provided."
-
-    return data
-
-# ── LLM call ──────────────────────────────────────────────────────────────────
-
-def call_llm(client: OpenAI, task_id: int, obs: dict) -> str:
-    system_prompt = SYSTEM_PROMPTS[task_id]
-    user_prompt = format_observation(obs, task_id)
-
-    try:
-        completion = client.chat.completions.create(
+        response = client.chat.completions.create(
             model=MODEL_NAME,
+            max_tokens=512,
+            temperature=0.1,
             messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user",   "content": user_prompt},
             ],
-            temperature=TEMPERATURE,
-            max_tokens=MAX_TOKENS,
-            stream=False,
         )
-        return (completion.choices[0].message.content or "").strip()
+        raw = response.choices[0].message.content.strip()
+        raw = raw.replace("```json", "").replace("```", "").strip()
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        return {"action": "ignore", "reasoning": "parse error"}
     except Exception as e:
-        print(f"[DEBUG] LLM call failed: {e}", flush=True)
-        return "{}"
+        print(f"[LLM ERROR] {e}", file=sys.stderr)
+        return {"action": "ignore", "reasoning": str(e)}
 
-# ── Run one task episode ──────────────────────────────────────────────────────
 
-def run_episode(client: OpenAI, task_id: int, seed: int) -> float:
-    task_name = TASK_NAMES[task_id]
+# ── Env helpers ────────────────────────────────────────────────────────────────
 
-    log_start(task=task_name, model=MODEL_NAME)
+def env_reset(task_id: int, seed: int = SEED) -> dict:
+    r = requests.post(f"{ENV_URL}/reset", json={"task_id": task_id, "seed": seed}, timeout=30)
+    r.raise_for_status()
+    return r.json()
 
-    rewards: List[float] = []
-    steps_taken = 0
-    score = 0.0
-    success = False
-    session_id = None
 
-    try:
-        # Reset
-        reset_result = env_reset(task_id=task_id, seed=seed)
-        session_id = reset_result.get("session_id", "default")
-        obs = reset_result.get("observation", {})
-        done = reset_result.get("done", False)
+def env_step(session_id: str, action: dict) -> dict:
+    payload = {"session_id": session_id, **action}
+    r = requests.post(f"{ENV_URL}/step", json=payload, timeout=30)
+    r.raise_for_status()
+    return r.json()
 
-        for step in range(1, MAX_STEPS + 1):
-            if done:
-                break
 
-            # Get LLM response
-            raw_text = call_llm(client, task_id, obs)
-            action_data = parse_action(raw_text, task_id)
+# ── Run one episode ────────────────────────────────────────────────────────────
 
-            # Step environment
-            result = env_step(action_data, session_id)
-            reward = float(result.get("reward", 0.0))
-            done = result.get("done", False)
-            info = result.get("info", {})
-            error = info.get("error", None)
-            obs = result.get("observation", obs) or obs
+def run_episode(task_id: int, seed: int = SEED) -> float:
+    reset_data   = env_reset(task_id, seed)
+    session_id   = reset_data["session_id"]
+    obs          = reset_data["observation"]
+    case_id      = reset_data["info"]["case_id"]
+    difficulty   = reset_data["info"]["difficulty"]
 
-            rewards.append(reward)
-            steps_taken = step
+    print(json.dumps({
+        "event":      "[START]",
+        "task_id":    task_id,
+        "case_id":    case_id,
+        "session_id": session_id,
+        "difficulty": difficulty,
+        "seed":       seed,
+    }))
 
-            # Action string for logging
-            action_str = action_data.get("action", "unknown")
-            if task_id == 2:
-                action_str += f"|threat={action_data.get('threat_level', '?')}"
-            elif task_id == 3:
-                action_str += f"|sector={action_data.get('target_sector', '?')}"
+    total_reward = 0.0
+    done         = False
+    step_num     = 0
 
-            log_step(
-                step=step,
-                action=action_str,
-                reward=reward,
-                done=done,
-                error=str(error) if error else None,
-            )
+    while not done and step_num < MAX_STEPS:
+        step_num += 1
+        user_prompt = build_user_prompt(obs)
+        action      = call_llm(user_prompt)
 
-            if done:
-                break
+        step_data = env_step(session_id, action)
+        reward    = step_data.get("reward", 0.0)
+        done      = step_data.get("done", True)
+        info      = step_data.get("info", {})
+        obs       = step_data.get("observation", obs)
+        total_reward = info.get("total_score", reward)
 
-            time.sleep(0.5)  # rate limit safety
+        print(json.dumps({
+            "event":    "[STEP]",
+            "task_id":  task_id,
+            "step":     step_num,
+            "action":   action,
+            "reward":   reward,
+            "done":     done,
+            "feedback": info.get("feedback", ""),
+        }))
 
-        # Score = average reward across steps
-        score = sum(rewards) / len(rewards) if rewards else 0.0
-        score = round(min(max(score, 0.0), 1.0), 3)
-        success = score >= SUCCESS_THRESHOLD
+        if not done:
+            time.sleep(0.5)
 
-    except Exception as e:
-        print(f"[DEBUG] Episode error: {e}", flush=True)
-        score = 0.0
-        success = False
+    print(json.dumps({
+        "event":        "[END]",
+        "task_id":      task_id,
+        "case_id":      case_id,
+        "total_reward": total_reward,
+        "steps":        step_num,
+    }))
 
-    finally:
-        log_end(
-            success=success,
-            steps=steps_taken,
-            score=score,
-            rewards=rewards,
-        )
+    return total_reward
 
-    return score
 
-# ── Main ──────────────────────────────────────────────────────────────────────
+# ── Main ───────────────────────────────────────────────────────────────────────
 
 def main():
-    client = OpenAI(
-        base_url=API_BASE_URL,
-        api_key=HF_TOKEN,
-    )
+    print(json.dumps({
+        "event":   "[START]",
+        "run":     "geoshield_baseline",
+        "model":   MODEL_NAME,
+        "env_url": ENV_URL,
+        "tasks":   TASKS,
+    }))
 
-    print(f"[DEBUG] ENV_URL={ENV_URL}", flush=True)
-    print(f"[DEBUG] MODEL={MODEL_NAME}", flush=True)
-    print(f"[DEBUG] API_BASE={API_BASE_URL}", flush=True)
-
-    all_scores = []
-
-    for task_id in [1, 2, 3]:
-        print(f"\n[DEBUG] ── Running Task {task_id}: {TASK_NAMES[task_id]} ──", flush=True)
-        score = run_episode(client, task_id=task_id, seed=42)
-        all_scores.append(score)
-        print(f"[DEBUG] Task {task_id} score: {score:.3f}", flush=True)
+    results = {}
+    for task_id in TASKS:
+        try:
+            score = run_episode(task_id, seed=SEED)
+            results[f"task_{task_id}"] = round(score, 4)
+        except Exception as e:
+            print(f"[ERROR] Task {task_id} failed: {e}", file=sys.stderr)
+            results[f"task_{task_id}"] = 0.0
         time.sleep(1)
 
-    overall = sum(all_scores) / len(all_scores)
-    print(f"\n[DEBUG] ── Overall Score: {overall:.3f} ──", flush=True)
-    print(f"[DEBUG] Task scores: T1={all_scores[0]:.3f} T2={all_scores[1]:.3f} T3={all_scores[2]:.3f}", flush=True)
+    overall = round(sum(results.values()) / len(results), 4)
+    results["overall"] = overall
+
+    print(json.dumps({
+        "event":   "[END]",
+        "run":     "geoshield_baseline",
+        "results": results,
+        "status":  "complete",
+    }))
+
 
 if __name__ == "__main__":
     main()

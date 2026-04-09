@@ -1,176 +1,247 @@
-import sys
-sys.path.insert(0, '/app')
-sys.path.insert(0, '/app/src/geoshield')
-
 from typing import Dict, Any
-from models import GeoShieldAction, GeoReward
+from src.geoshield.models import GeoShieldAction, GeoReward
+from src.geoshield.constants import STRATEGIC_KEYWORDS
 
 
-def _clamp(score: float) -> float:
-    """Score must be strictly between 0 and 1"""
-    score = round(score, 3)
-    if score <= 0.0:
-        return 0.01
-    if score >= 1.0:
-        return 0.99
-    return score
-
-
-# ── Task 1 Grader ─────────────────────────────────────────────────────────────
-
-TASK1_CORRECT = {
-    "ignore": "ignore",
-    "flag_for_review": "flag_for_review",
-}
+# ── Task 1 grader ─────────────────────────────────────────────────────────────
 
 def grade_task1(action: GeoShieldAction, case: Dict[str, Any]) -> GeoReward:
-    gold = case.get("gold_action", "")
-    agent = action.action.strip().lower()
+    gold = case.get("gold_action")
+    correct = action.action == gold
 
-    if agent == gold:
-        score = 0.99
-        feedback = f"Correct! '{agent}' matches gold action."
-    else:
-        score = 0.01
-        feedback = f"Incorrect. You chose '{agent}', gold was '{gold}'."
-
+    if correct:
+        return GeoReward(
+            score=0.99,
+            feedback=f"Correct! '{action.action}' matches gold action.",
+            breakdown={"action_score": 0.99}
+        )
     return GeoReward(
-        score=_clamp(score),
-        feedback=feedback,
-        breakdown={
-            "gold_action": gold,
-            "agent_action": agent,
-            "difficulty": case.get("difficulty", "easy"),
-        }
+        score=0.01,
+        feedback=f"Incorrect. Expected '{gold}', got '{action.action}'.",
+        breakdown={"action_score": 0.01}
     )
 
 
-# ── Task 2 Grader ─────────────────────────────────────────────────────────────
+# ── Task 2 grader ─────────────────────────────────────────────────────────────
 
-CLASSIFICATION_PROXIMITY = {
-    "troop_movement":        {"troop_movement": 0.99, "weapons_cache": 0.5, "unauthorized_aircraft": 0.3, "illegal_construction": 0.1, "civilian_activity": 0.01},
-    "illegal_construction":  {"illegal_construction": 0.99, "civilian_activity": 0.4, "weapons_cache": 0.2, "troop_movement": 0.1, "unauthorized_aircraft": 0.01},
-    "unauthorized_aircraft": {"unauthorized_aircraft": 0.99, "troop_movement": 0.4, "weapons_cache": 0.2, "illegal_construction": 0.1, "civilian_activity": 0.01},
-    "weapons_cache":         {"weapons_cache": 0.99, "troop_movement": 0.5, "illegal_construction": 0.2, "unauthorized_aircraft": 0.2, "civilian_activity": 0.01},
-    "civilian_activity":     {"civilian_activity": 0.99, "illegal_construction": 0.3, "troop_movement": 0.01, "unauthorized_aircraft": 0.01, "weapons_cache": 0.01},
+RELATED_THREATS = {
+    "troop_movement": ["weapons_cache", "illegal_construction"],
+    "weapons_cache": ["troop_movement", "illegal_construction"],
+    "illegal_construction": ["troop_movement", "unauthorized_aircraft"],
+    "unauthorized_aircraft": ["illegal_construction", "weapons_cache"],
+    "civilian_activity": [],
 }
 
 def grade_task2(action: GeoShieldAction, case: Dict[str, Any]) -> GeoReward:
-    gold_class = case.get("gold_action", "")
-    gold_level = int(case.get("gold_threat_level", 5))
-    agent_class = action.action.strip().lower()
-    agent_level = action.threat_level or 5
+    gold_action = case.get("gold_action")
+    gold_level = case.get("gold_threat_level", 5)
+    predicted_level = action.threat_level or 5
 
-    # Classification score (0.5 weight)
-    class_score = CLASSIFICATION_PROXIMITY.get(gold_class, {}).get(agent_class, 0.01)
-
-    # Threat level score (0.5 weight) — closer to gold = higher score
-    level_diff = abs(agent_level - gold_level)
-    if level_diff == 0:
-        level_score = 0.99
-    elif level_diff == 1:
-        level_score = 0.8
-    elif level_diff == 2:
-        level_score = 0.6
-    elif level_diff == 3:
-        level_score = 0.4
-    elif level_diff <= 5:
-        level_score = 0.2
+    # Classification score
+    if action.action == gold_action:
+        class_score = 0.99
+    elif action.action in RELATED_THREATS.get(gold_action, []):
+        class_score = 0.45
     else:
-        level_score = 0.01
+        class_score = 0.01
 
-    # Combined score
-    combined = (class_score * 0.5) + (level_score * 0.5)
+    # Threat level score
+    diff = abs(predicted_level - gold_level)
+    if diff == 0:
+        level_score = 0.99
+    elif diff == 1:
+        level_score = 0.80
+    elif diff == 2:
+        level_score = 0.60
+    elif diff == 3:
+        level_score = 0.40
+    else:
+        level_score = 0.10
 
-    feedback = (
-        f"Classification: '{agent_class}' vs gold '{gold_class}' (score: {class_score:.2f}). "
-        f"Threat level: {agent_level} vs gold {gold_level} (score: {level_score:.2f})."
-    )
+    final = round(0.5 * class_score + 0.5 * level_score, 3)
+    final = max(0.01, min(0.99, final))
 
     return GeoReward(
-        score=_clamp(combined),
-        feedback=feedback,
+        score=final,
+        feedback=(
+            f"Classification: {'correct' if class_score > 0.5 else 'incorrect'} "
+            f"(expected '{gold_action}'). "
+            f"Threat level: {predicted_level} vs gold {gold_level} (diff={diff})."
+        ),
         breakdown={
-            "gold_action": gold_class,
-            "agent_action": agent_class,
-            "gold_threat_level": gold_level,
-            "agent_threat_level": agent_level,
             "classification_score": class_score,
-            "level_score": level_score,
-            "difficulty": case.get("difficulty", "easy"),
+            "threat_level_score": level_score,
+            "final_score": final,
         }
     )
 
 
-# ── Task 3 Grader ─────────────────────────────────────────────────────────────
+# ── Task 3 grader ─────────────────────────────────────────────────────────────
 
 def grade_task3(action: GeoShieldAction, case: Dict[str, Any]) -> GeoReward:
-    gold_sector = case.get("gold_action", "")
-    agent_sector = action.target_sector or action.action.strip().lower()
-    reasoning = action.reasoning or ""
+    gold_action = case.get("gold_action")
+    second_best = case.get("second_best_sector", "")
 
-    # Sector selection score (0.5 weight)
-    if agent_sector == gold_sector:
-        sector_score = 0.5
-        sector_feedback = f"Correct sector '{agent_sector}'."
-    else:
-        # Partial credit if second-best sector
-        second_best = case.get("second_best_sector", "")
-        if agent_sector == second_best:
-            sector_score = 0.25
-            sector_feedback = f"Second-best sector. Gold was '{gold_sector}'."
+    # Handle investigate actions
+    if action.action.startswith("investigate_"):
+        sector = action.action.replace("investigate_", "")
+        gold_sector = gold_action.replace("deploy_to_", "")
+        if sector == gold_sector:
+            return GeoReward(
+                score=0.55,
+                feedback=f"Good — investigating the right sector ({sector}). Now deploy.",
+                breakdown={"investigate_score": 0.55}
+            )
         else:
-            sector_score = 0.01
-            sector_feedback = f"Wrong sector '{agent_sector}'. Gold was '{gold_sector}'."
+            return GeoReward(
+                score=0.25,
+                feedback=f"Investigating {sector} — not the highest priority sector.",
+                breakdown={"investigate_score": 0.25}
+            )
 
-    # Reasoning score (0.5 weight)
-    reasoning_score = 0.01
-    if len(reasoning.strip()) > 20:
-        reasoning_score += 0.1
-    if len(reasoning.strip()) > 80:
-        reasoning_score += 0.1
-    if len(reasoning.strip()) > 150:
-        reasoning_score += 0.1
+    # Sector selection score
+    if action.action == gold_action:
+        sector_score = 0.99
+    elif action.action == second_best:
+        sector_score = 0.55
+    else:
+        sector_score = 0.01
 
-    # Keyword bonus
-    keywords = [
-        "threat", "priority", "sector", "critical", "intelligence",
-        "deploy", "risk", "anomaly", "military", "hostile",
-        "construction", "movement", "aircraft", "convoy", "bunker"
-    ]
-    matches = sum(1 for kw in keywords if kw in reasoning.lower())
-    if matches >= 3:
-        reasoning_score += 0.1
-    if matches >= 5:
-        reasoning_score += 0.1
+    # Reasoning score
+    reasoning = action.reasoning or ""
+    reasoning_score = 0.10
 
-    reasoning_score = min(0.5, reasoning_score)
+    if len(reasoning) > 20:
+        reasoning_score += 0.10
+    if len(reasoning) > 80:
+        reasoning_score += 0.10
+    if len(reasoning) > 150:
+        reasoning_score += 0.10
 
-    combined = sector_score + reasoning_score
+    keyword_hits = sum(1 for kw in STRATEGIC_KEYWORDS if kw.lower() in reasoning.lower())
+    if keyword_hits >= 3:
+        reasoning_score += 0.10
+    if keyword_hits >= 5:
+        reasoning_score += 0.10
+    if keyword_hits >= 8:
+        reasoning_score += 0.10
 
-    feedback = (
-        f"{sector_feedback} "
-        f"Reasoning score: {reasoning_score:.2f} "
-        f"(length: {len(reasoning)} chars, keywords: {matches})."
-    )
+    reasoning_score = min(reasoning_score, 0.99)
+
+    final = round(0.5 * sector_score + 0.5 * reasoning_score, 3)
+    final = max(0.01, min(0.99, final))
 
     return GeoReward(
-        score=_clamp(combined),
-        feedback=feedback,
+        score=final,
+        feedback=(
+            f"Sector: {'correct' if sector_score > 0.5 else 'incorrect'} "
+            f"(expected '{gold_action}'). "
+            f"Reasoning: {len(reasoning)} chars, {keyword_hits} keywords."
+        ),
         breakdown={
-            "gold_sector": gold_sector,
-            "agent_sector": agent_sector,
             "sector_score": sector_score,
             "reasoning_score": reasoning_score,
-            "reasoning_length": len(reasoning),
-            "keyword_matches": matches,
-            "difficulty": case.get("difficulty", "easy"),
+            "keyword_hits": keyword_hits,
+            "final_score": final,
         }
     )
 
+
+# ── Task 4 grader ─────────────────────────────────────────────────────────────
+
+DECEPTION_TYPES = {
+    "civilian_military": "Military assets disguised as civilian infrastructure",
+    "commercial_weapons": "Weapons development hidden inside commercial facilities",
+    "construction_fortification": "Military fortification disguised as construction",
+    "logistics_supply": "Military supply chain disguised as commercial logistics",
+    "research_weapons": "Weapons research disguised as civilian research facility",
+}
+
+def grade_task4(action: GeoShieldAction, case: Dict[str, Any]) -> GeoReward:
+    gold_action = case.get("gold_action")
+    gold_cover = case.get("gold_cover_story", "")
+    gold_deception = case.get("gold_deception_type", "")
+
+    # Primary classification score
+    if action.action == gold_action:
+        class_score = 0.99
+    elif action.action == "request_verification" and gold_action == "covert_operation":
+        class_score = 0.50  # partial credit for cautious approach
+    else:
+        class_score = 0.01
+
+    # Cover story identification score
+    cover_score = 0.01
+    identified_cover = (action.cover_story_identified or "").lower()
+    gold_cover_lower = gold_cover.lower()
+
+    cover_keywords = gold_cover_lower.split()
+    hits = sum(1 for kw in cover_keywords if len(kw) > 4 and kw in identified_cover)
+    if hits >= 3:
+        cover_score = 0.99
+    elif hits >= 2:
+        cover_score = 0.70
+    elif hits >= 1:
+        cover_score = 0.40
+
+    # Deception type score
+    deception_score = 0.01
+    if action.deception_type and gold_deception:
+        if action.deception_type == gold_deception:
+            deception_score = 0.99
+        elif action.deception_type in DECEPTION_TYPES:
+            deception_score = 0.30
+
+    # Reasoning score
+    reasoning = action.reasoning or ""
+    reasoning_score = 0.10
+    if len(reasoning) > 50:
+        reasoning_score += 0.10
+    if len(reasoning) > 150:
+        reasoning_score += 0.15
+    if len(reasoning) > 300:
+        reasoning_score += 0.15
+    keyword_hits = sum(1 for kw in STRATEGIC_KEYWORDS if kw.lower() in reasoning.lower())
+    if keyword_hits >= 5:
+        reasoning_score += 0.10
+    if keyword_hits >= 8:
+        reasoning_score += 0.15
+    reasoning_score = min(reasoning_score, 0.99)
+
+    # Weighted final
+    final = round(
+        0.40 * class_score +
+        0.25 * cover_score +
+        0.15 * deception_score +
+        0.20 * reasoning_score,
+        3
+    )
+    final = max(0.01, min(0.99, final))
+
+    return GeoReward(
+        score=final,
+        feedback=(
+            f"Classification: {'correct' if class_score > 0.5 else 'incorrect'} "
+            f"(expected '{gold_action}'). "
+            f"Cover story: {hits} keyword matches. "
+            f"Deception type: {'correct' if deception_score > 0.5 else 'incorrect'}. "
+            f"Reasoning: {len(reasoning)} chars."
+        ),
+        breakdown={
+            "classification_score": class_score,
+            "cover_story_score": cover_score,
+            "deception_type_score": deception_score,
+            "reasoning_score": reasoning_score,
+            "final_score": final,
+        }
+    )
+
+
+# ── Registry ──────────────────────────────────────────────────────────────────
 
 GRADERS = {
     1: grade_task1,
     2: grade_task2,
     3: grade_task3,
+    4: grade_task4,
 }
