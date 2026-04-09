@@ -190,7 +190,7 @@ class GeoShieldEnvironment:
                     sector_id=s.get("sector_id", ""),
                     summary=s.get("summary", ""),
                     anomaly_type=s.get("anomaly_type"),
-                    confidence=s.get("confidence", 0.0),
+                    confidence=s.get("confidence", 0.5),
                     coordinates=s.get("coordinates"),
                     timestamp=s.get("timestamp", "00:00Z"),
                 ))
@@ -274,7 +274,7 @@ class GeoShieldEnvironment:
         for s in sectors_raw:
             if s.get("sector_id", "").upper() == sector:
                 anomaly = s.get("anomaly_type", "no anomaly")
-                confidence = s.get("confidence", 0.0)
+                confidence = s.get("confidence", 0.5)
                 if sector == gold_sector:
                     return f"PRIORITY CONFIRMED — {anomaly} detected, confidence {confidence:.0%}. Immediate drone deployment recommended."
                 else:

@@ -6,7 +6,7 @@ class SectorReport(BaseModel):
     sector_id: str
     summary: str
     anomaly_type: Optional[str] = None
-    confidence: float = 0.0
+    confidence: float = 0.5
     coordinates: Optional[str] = None
     timestamp: str = "00:00Z"
     cover_story: Optional[str] = None
@@ -49,7 +49,7 @@ class GeoState(BaseModel):
     completed: bool = False
     step: int = 0
     rewards: List[float] = []
-    total_score: float = 0.0
+    total_score: float = 0.01
     difficulty: str = "easy"
     current_observation: Optional[str] = None
     investigation_used: bool = False
