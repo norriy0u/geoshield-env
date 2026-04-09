@@ -15,52 +15,6 @@ app = FastAPI(
     version="2.0.0",
 )
 
-
-def deep_clamp(obj):
-    """Recursively convert any exact 0.0 → 0.01 and 1.0 → 0.99 in JSON output."""
-    if isinstance(obj, dict):
-        return {k: deep_clamp(v) for k, v in obj.items()}
-    elif isinstance(obj, list):
-        return [deep_clamp(i) for i in obj]
-    elif isinstance(obj, bool):   # ← check bool BEFORE int/float
-        return obj
-    elif isinstance(obj, (int, float)):   # ← add int here
-        if obj == 0:
-            return 0.01
-        if obj == 1:
-            return 0.99
-        return obj
-    return obj
-
-
-@app.middleware("http")
-async def clamp_scores_middleware(request: Request, call_next):
-    response = await call_next(request)
-    content_type = response.headers.get("content-type", "")
-    if "application/json" in content_type:
-        body = b""
-        async for chunk in response.body_iterator:
-            body += chunk
-        try:
-            data = json.loads(body)
-            data = deep_clamp(data)
-            new_body = json.dumps(data).encode("utf-8")
-            return JSONResponse(
-                content=data,
-                status_code=response.status_code,
-                headers=dict(response.headers),
-            )
-        except Exception:
-            from starlette.responses import Response
-            return Response(
-                content=body,
-                status_code=response.status_code,
-                headers=dict(response.headers),
-                media_type=content_type,
-            )
-    return response
-
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
