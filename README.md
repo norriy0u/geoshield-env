@@ -36,6 +36,7 @@ GeoShield trains agents to perform the **Strategic Command Interface** layer —
 ---
 
 ## Environment Architecture
+```
 Satellite Image
 │
 ▼
@@ -49,6 +50,7 @@ Text Intelligence Report
 │
 ▼
 Strategic Decision (ignore / classify / deploy / unmask)
+```
 ---
 
 ## Tasks
@@ -331,6 +333,7 @@ python baselines/rules_agent.py
 ---
 
 ## Project Structure
+```
 geoshield-env/
 ├── Dockerfile
 ├── requirements.txt
@@ -362,6 +365,7 @@ geoshield-env/
 └── baselines/
 ├── random_agent.py
 └── rules_agent.py
+```
 ---
 
 ## Data
