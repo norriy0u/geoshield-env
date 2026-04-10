@@ -5,7 +5,6 @@ description: >
   evaluating RL agents on real-world defense analyst workflows. Agents must
   classify satellite reports, identify threats, allocate surveillance assets,
   and unmask covert operations hidden behind civilian cover stories.
-
 author: norriy0u
 license: MIT
 tags:
@@ -22,7 +21,8 @@ tasks:
     difficulty: easy
     description: >
       Classify satellite scan reports as genuine threats requiring review
-      or false alarms that can be safely ignored.
+      or false alarms that can be safely ignored. Partial credit awarded
+      on medium and hard cases to provide meaningful reward signal.
     actions:
       - ignore
       - flag_for_review
@@ -30,7 +30,7 @@ tasks:
       report: string
       context: string
       hint: string
-    reward_range: [0.01, 0.99]
+    reward_range: [0.0, 1.0]
     max_steps: 2
     cases: 30
 
@@ -52,7 +52,7 @@ tasks:
       context: string
       threat_level: integer
       hint: string
-    reward_range: [0.01, 0.99]
+    reward_range: [0.0, 1.0]
     max_steps: 3
     cases: 30
 
@@ -77,7 +77,7 @@ tasks:
       investigation_results: dict
       steps_remaining: integer
       hint: string
-    reward_range: [0.01, 0.99]
+    reward_range: [0.0, 1.0]
     max_steps: 6
     cases: 30
 
@@ -101,7 +101,7 @@ tasks:
       deception_indicators: list[string]
       steps_remaining: integer
       hint: string
-    reward_range: [0.01, 0.99]
+    reward_range: [0.0, 1.0]
     max_steps: 4
     cases: 30
 
@@ -172,7 +172,7 @@ baselines:
     task_1: 0.72
     task_2: 0.58
     task_3: 0.51
-    task_4: 0.38
+    task_4: 0.40
     overall: 0.55
 
   llm_agent:
