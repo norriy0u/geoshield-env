@@ -27,8 +27,6 @@ class GeoShieldEnvironment:
         self.drone_deployed: bool = False
         self.case_id: str = ""
 
-    # ── reset ──────────────────────────────────────────────────────────────────
-
     def reset(self, task_id: int = 1, seed: int = 42, split: str = "train") -> Dict[str, Any]:
         self.task_id = task_id
         self.seed = seed
@@ -57,8 +55,6 @@ class GeoShieldEnvironment:
             }
         }
 
-    # ── step ───────────────────────────────────────────────────────────────────
-
     def step(self, action_input: Dict[str, Any]) -> Dict[str, Any]:
         if self.done:
             obs = self._build_observation()
@@ -79,12 +75,20 @@ class GeoShieldEnvironment:
             result = self._handle_investigation(action.action)
             self.investigation_results[action.action] = result
 
-            obs = self._build_observation()
-            reward_val = _clamp(0.30 if action.action.replace("investigate_", "deploy_to_") == self.case.get("gold_action") else 0.10)
+            is_right_sector = (
+                action.action.replace("investigate_", "deploy_to_")
+                == self.case.get("gold_action")
+            )
+            reward_val = _clamp(0.30 if is_right_sector else 0.10)
+            self.rewards.append(reward_val)  # FIX: was missing
 
             if self.step_count >= max_steps:
                 self.done = True
 
+            total = _clamp(sum(self.rewards) / len(self.rewards))  # safe now
+            self.total_score = total
+
+            obs = self._build_observation()
             return {
                 "observation": obs.model_dump(),
                 "reward": reward_val,
@@ -92,7 +96,7 @@ class GeoShieldEnvironment:
                 "info": {
                     "feedback": f"Investigation complete: {result}",
                     "step": self.step_count,
-                    "total_score": _clamp(sum(self.rewards) + reward_val),
+                    "total_score": total,
                 },
             }
 
@@ -101,11 +105,14 @@ class GeoShieldEnvironment:
             verification = self._handle_verification()
             obs = self._build_observation(extra_hint=verification)
             reward_val = _clamp(0.35)
+            self.rewards.append(reward_val)
 
             if self.step_count >= max_steps:
                 self.done = True
 
-            self.rewards.append(reward_val)
+            total = _clamp(sum(self.rewards) / len(self.rewards))
+            self.total_score = total
+
             return {
                 "observation": obs.model_dump(),
                 "reward": reward_val,
@@ -113,7 +120,7 @@ class GeoShieldEnvironment:
                 "info": {
                     "feedback": f"Verification requested. Additional intel: {verification}",
                     "step": self.step_count,
-                    "total_score": _clamp(sum(self.rewards)),
+                    "total_score": total,
                 },
             }
 
@@ -143,12 +150,8 @@ class GeoShieldEnvironment:
             },
         }
 
-    # ── state ──────────────────────────────────────────────────────────────────
-
     def state(self) -> Dict[str, Any]:
         return self._build_state().model_dump()
-
-    # ── internal helpers ───────────────────────────────────────────────────────
 
     def _build_observation(self, extra_hint: Optional[str] = None) -> GeoObservation:
         task_id = self.task_id
