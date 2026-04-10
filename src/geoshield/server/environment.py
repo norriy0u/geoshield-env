@@ -76,25 +76,27 @@ class GeoShieldEnvironment:
 
         # ── Task 3: handle investigate actions (multi-turn) ───────────────────
         if self.task_id == 3 and action.action.startswith("investigate_"):
-            result = self._handle_investigation(action.action)
-            self.investigation_results[action.action] = result
+    result = self._handle_investigation(action.action)
+    self.investigation_results[action.action] = result
 
-            obs = self._build_observation()
-            reward_val = _clamp(0.30 if action.action.replace("investigate_", "deploy_to_") == self.case.get("gold_action") else 0.10)
+    obs = self._build_observation()
+    reward_val = _clamp(0.30 if action.action.replace("investigate_", "deploy_to_") == self.case.get("gold_action") else 0.10)
+    self.rewards.append(reward_val)                          # ← ADD THIS
+    self.total_score = _clamp(sum(self.rewards) / len(self.rewards))  # ← ADD THIS
 
-            if self.step_count >= max_steps:
-                self.done = True
+    if self.step_count >= max_steps:
+        self.done = True
 
-            return {
-                "observation": obs.model_dump(),
-                "reward": reward_val,
-                "done": self.done,
-                "info": {
-                    "feedback": f"Investigation complete: {result}",
-                    "step": self.step_count,
-                    "total_score": _clamp(sum(self.rewards) + reward_val),
-                },
-            }
+    return {
+        "observation": obs.model_dump(),
+        "reward": reward_val,
+        "done": self.done,
+        "info": {
+            "feedback": f"Investigation complete: {result}",
+            "step": self.step_count,
+            "total_score": self.total_score,   # ← use self.total_score
+        },
+    }
 
         # ── Task 4: handle request_verification ───────────────────────────────
         if self.task_id == 4 and action.action == "request_verification":
