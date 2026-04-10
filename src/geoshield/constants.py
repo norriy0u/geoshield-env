@@ -1,3 +1,5 @@
+from typing import List
+
 TASK_ACTIONS = {
     1: ["ignore", "flag_for_review"],
     2: ["troop_movement", "illegal_construction", "unauthorized_aircraft", "weapons_cache", "civilian_activity"],
@@ -33,3 +35,18 @@ STRATEGIC_KEYWORDS = [
     "immediate", "strategic", "tactical", "covert", "deception",
     "cover", "legitimate", "suspicious", "anomaly", "pattern",
 ]
+
+# Valid gold actions per task — used for defensive validation
+VALID_GOLD_ACTIONS = {
+    1: ["ignore", "flag_for_review"],
+    2: ["troop_movement", "illegal_construction", "unauthorized_aircraft", "weapons_cache", "civilian_activity"],
+    3: ["deploy_to_sector_a", "deploy_to_sector_b", "deploy_to_sector_c"],
+    4: ["covert_operation", "legitimate_activity"],
+}
+
+DEFAULT_GOLD_ACTIONS = {
+    1: "ignore",
+    2: "civilian_activity",
+    3: "deploy_to_sector_a",
+    4: "legitimate_activity",
+}
