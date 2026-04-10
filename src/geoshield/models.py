@@ -49,7 +49,7 @@ class GeoState(BaseModel):
     completed: bool = False
     step: int = 0
     rewards: List[float] = []
-    total_score: float = 0.01
+    total_score: float = 0.02
     difficulty: str = "easy"
     current_observation: Optional[str] = None
     investigation_used: bool = False
