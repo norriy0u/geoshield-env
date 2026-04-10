@@ -242,7 +242,6 @@ def main():
     overall = clamp(sum(results.values()) / len(results))
     results["overall"] = overall
 
-    print(f"[END] success=true steps=0 rewards=0.02", flush=True)
 
 
 if __name__ == "__main__":
