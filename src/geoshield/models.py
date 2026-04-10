@@ -44,8 +44,8 @@ class GeoReward(BaseModel):
     breakdown: dict = {}
 
     def model_post_init(self, __context):
-        # Double-safety: clamp score even if grader passes bad value
-        self.score = round(max(0.01, min(0.99, float(self.score))), 4)
+        # Hard clamp: never touch 0.0 or 1.0 boundaries
+        self.score = round(max(0.02, min(0.98, float(self.score))), 4)
 
 
 class GeoState(BaseModel):
@@ -54,7 +54,7 @@ class GeoState(BaseModel):
     completed: bool = False
     step: int = 0
     rewards: List[float] = []
-    total_score: float = 0.01
+    total_score: float = 0.02
     difficulty: str = "easy"
     current_observation: Optional[str] = None
     investigation_used: bool = False
