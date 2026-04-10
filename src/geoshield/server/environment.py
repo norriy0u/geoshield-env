@@ -5,13 +5,11 @@ from src.geoshield.constants import TASK_ACTIONS, MAX_STEPS, TASK_NAMES
 from src.geoshield.server.generators import sample_case
 from src.geoshield.server.graders import GRADERS
 
-
 def _clamp(score: float) -> float:
     try:
         return round(max(0.02, min(0.98, float(score))), 4)
     except Exception:
         return 0.02
-
 
 class GeoShieldEnvironment:
     def __init__(self):
@@ -22,7 +20,7 @@ class GeoShieldEnvironment:
         self.step_count: int = 0
         self.done: bool = False
         self.rewards: list = []
-        self.total_score: float = 0.01
+        self.total_score: float = 0.02
         self.investigation_results: Dict[str, str] = {}
         self.drone_deployed: bool = False
         self.case_id: str = ""
@@ -34,7 +32,7 @@ class GeoShieldEnvironment:
         self.step_count = 0
         self.done = False
         self.rewards = []
-        self.total_score = 0.01
+        self.total_score = 0.02
         self.investigation_results = {}
         self.drone_deployed = False
 
@@ -60,7 +58,7 @@ class GeoShieldEnvironment:
             obs = self._build_observation()
             return {
                 "observation": obs.model_dump(),
-                "reward": 0.01,
+                "reward": 0.02,
                 "done": True,
                 "info": {"feedback": "Episode already completed."},
                 "session_id": None,
