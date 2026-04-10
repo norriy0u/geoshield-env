@@ -52,9 +52,9 @@ Always respond with valid JSON only. No explanation outside the JSON."""
 
 def clamp(score) -> float:
     try:
-        return round(max(0.01, min(0.99, float(score))), 4)
+        return round(max(0.02, min(0.98, float(score))), 4)
     except Exception:
-        return 0.01
+        return 0.02
 
 
 def rules_fallback(obs: dict) -> dict:
@@ -180,13 +180,13 @@ def run_episode(task_id: int, seed: int = SEED) -> float:
         difficulty = reset_data["info"]["difficulty"]
     except Exception as e:
         print(f"[START] task={task_id} env=geoshield model={MODEL_NAME}", flush=True)
-        print(f"[STEP] step=1 action=ignore reward=0.01 done=true error=reset_failed", flush=True)
-        print(f"[END] success=false steps=1 score=0.01 rewards=0.01", flush=True)
-        return 0.01
+        print(f"[STEP] step=1 action=ignore reward=0.02 done=true error=reset_failed", flush=True)
+        print(f"[END] success=false steps=1 score=0.02 rewards=0.02", flush=True)
+        return 0.02
 
     print(f"[START] task={task_id} env=geoshield model={MODEL_NAME}", flush=True)
 
-    total_reward = 0.01
+    total_reward = 0.02
     done         = False
     step_num     = 0
     rewards_list = []
@@ -198,7 +198,7 @@ def run_episode(task_id: int, seed: int = SEED) -> float:
             action       = call_llm(user_prompt, obs)
 
             step_data    = env_step(session_id, action)
-            raw_reward   = step_data.get("reward", 0.01)
+            raw_reward   = step_data.get("reward", 0.02)
             reward       = clamp(raw_reward)
             done         = step_data.get("done", True)
             info         = step_data.get("info", {})
@@ -214,11 +214,11 @@ def run_episode(task_id: int, seed: int = SEED) -> float:
                 time.sleep(0.5)
 
     except Exception as e:
-        rewards_list.append(0.01)
-        print(f"[STEP] step={step_num} action=ignore reward=0.01 done=true error={str(e)}", flush=True)
-        total_reward = 0.01
+        rewards_list.append(0.02)
+        print(f"[STEP] step={step_num} action=ignore reward=0.02 done=true error={str(e)}", flush=True)
+        total_reward = 0.02
 
-    rewards_str = ",".join(f"{r:.2f}" for r in rewards_list) if rewards_list else "0.01"
+    rewards_str = ",".join(f"{r:.2f}" for r in rewards_list) if rewards_list else "0.02"
     success = total_reward >= 0.5
     print(f"[END] success={str(success).lower()} steps={step_num} score={total_reward:.2f} rewards={rewards_str}", flush=True)
     return total_reward
@@ -234,9 +234,9 @@ def main():
             results[f"task_{task_id}"] = clamp(score)
         except Exception as e:
             print(f"[START] task={task_id} env=geoshield model={MODEL_NAME}", flush=True)
-            print(f"[STEP] step=1 action=ignore reward=0.01 done=true error={str(e)}", flush=True)
-            print(f"[END] success=false steps=1 score=0.01 rewards=0.01", flush=True)
-            results[f"task_{task_id}"] = 0.01
+            print(f"[STEP] step=1 action=ignore reward=0.02 done=true error={str(e)}", flush=True)
+            print(f"[END] success=false steps=1 score=0.02 rewards=0.02", flush=True)
+            results[f"task_{task_id}"] = 0.02
         time.sleep(1)
 
     overall = clamp(sum(results.values()) / len(results))

@@ -21,7 +21,7 @@ TASK_NAMES = {
 }
 
 DIFFICULTY_WEIGHTS = {
-    "easy": 1.0,
+    "easy": 0.98,
     "medium": 1.5,
     "hard": 2.0,
     "ultra": 3.0,
