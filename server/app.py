@@ -77,7 +77,7 @@ def info():
             "3": {"name": "drone_allocation", "difficulty": "hard", "actions": ["deploy_to_sector_a", "deploy_to_sector_b", "deploy_to_sector_c", "investigate_sector_a", "investigate_sector_b", "investigate_sector_c"]},
             "4": {"name": "covert_operation_detection", "difficulty": "ultra", "actions": ["covert_operation", "legitimate_activity", "request_verification"]},
         },
-        "reward_range": [0.01, 0.99],
+        "reward_range": [0.02, 0.98],
         "splits": ["train", "eval"],
     }
 
