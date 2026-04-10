@@ -75,7 +75,7 @@ class GeoShieldEnvironment:
         max_steps = MAX_STEPS.get(self.task_id, 3)
 
         # ── Task 3: handle investigate actions (multi-turn) ───────────────────
-if self.task_id == 3 and action.action.startswith("investigate_"):
+        if self.task_id == 3 and action.action.startswith("investigate_"):
             result = self._handle_investigation(action.action)
             self.investigation_results[action.action] = result
             obs = self._build_observation()
