@@ -29,24 +29,19 @@ client = OpenAI(
 
 SYSTEM_PROMPT = """You are a satellite intelligence analyst. You will receive
 intelligence reports and must respond with precise JSON actions.
-
 For Task 1 (false alarm detection):
   {"action": "ignore"} or {"action": "flag_for_review"}
-
 For Task 2 (threat classification):
   {"action": "<threat_type>", "threat_level": <1-10>}
   threat types: troop_movement, illegal_construction, unauthorized_aircraft, weapons_cache, civilian_activity
-
 For Task 3 (drone allocation):
   {"action": "deploy_to_sector_a|b|c"} or {"action": "investigate_sector_a|b|c"}
   Include: {"reasoning": "<your strategic analysis>"}
-
 For Task 4 (covert operation detection):
   {"action": "covert_operation|legitimate_activity|request_verification",
    "cover_story_identified": "<the civilian cover being used>",
    "deception_type": "<one of: civilian_military|commercial_weapons|construction_fortification|logistics_supply|research_weapons>",
    "reasoning": "<your analysis of the deception indicators>"}
-
 Always respond with valid JSON only. No explanation outside the JSON."""
 
 
@@ -181,7 +176,7 @@ def run_episode(task_id: int, seed: int = SEED) -> float:
     except Exception as e:
         print(f"[START] task={task_id} env=geoshield model={MODEL_NAME}", flush=True)
         print(f"[STEP] step=1 action=ignore reward=0.01 done=true error=reset_failed", flush=True)
-        print(f"[END] success=false steps=1 score=0.01 rewards=0.01", flush=True)
+        print(f"[END] success=false steps=1 rewards=0.01", flush=True)
         return 0.01
 
     print(f"[START] task={task_id} env=geoshield model={MODEL_NAME}", flush=True)
@@ -220,29 +215,19 @@ def run_episode(task_id: int, seed: int = SEED) -> float:
 
     rewards_str = ",".join(f"{r:.2f}" for r in rewards_list) if rewards_list else "0.01"
     success = total_reward >= 0.5
-    print(f"[END] success={str(success).lower()} steps={step_num} score={total_reward:.2f} rewards={rewards_str}", flush=True)
+    print(f"[END] success={str(success).lower()} steps={step_num} rewards={rewards_str}", flush=True)
     return total_reward
 
 
 def main():
-    print(f"[START] run=geoshield_baseline model={MODEL_NAME} tasks={TASKS}", flush=True)
-
-    results = {}
     for task_id in TASKS:
         try:
-            score = run_episode(task_id, seed=SEED)
-            results[f"task_{task_id}"] = clamp(score)
+            run_episode(task_id, seed=SEED)
         except Exception as e:
             print(f"[START] task={task_id} env=geoshield model={MODEL_NAME}", flush=True)
             print(f"[STEP] step=1 action=ignore reward=0.01 done=true error={str(e)}", flush=True)
-            print(f"[END] success=false steps=1 score=0.01 rewards=0.01", flush=True)
-            results[f"task_{task_id}"] = 0.01
+            print(f"[END] success=false steps=1 rewards=0.01", flush=True)
         time.sleep(1)
-
-    overall = clamp(sum(results.values()) / len(results))
-    results["overall"] = overall
-
-    print(f"[END] run=geoshield_baseline score={overall:.2f} results={json.dumps(results)}", flush=True)
 
 
 if __name__ == "__main__":
