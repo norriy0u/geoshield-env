@@ -50,11 +50,13 @@ For Task 4 (covert operation detection):
 Always respond with valid JSON only. No explanation outside the JSON."""
 
 
+# ── FIX #6: clamp to [0, 1] not [0.02, 0.98] ────────────────────────────────
 def clamp(score) -> float:
+    """Clamp score to [0, 1] range as required by spec."""
     try:
-        return round(max(0.02, min(0.98, float(score))), 4)
+        return min(max(float(score), 0.0), 1.0)
     except Exception:
-        return 0.02
+        return 0.0
 
 
 def rules_fallback(obs: dict) -> dict:
@@ -152,7 +154,7 @@ def call_llm(user_prompt: str, obs: dict = None) -> dict:
         raw = raw.replace("```json", "").replace("```", "").strip()
         return json.loads(raw)
     except Exception as e:
-        print(f"[ERROR] llm_error={e} using_fallback=true", file=sys.stderr, flush=True)
+        print(f"[DEBUG] llm_error={e} using_fallback=true", file=sys.stderr, flush=True)
         if obs is not None:
             return rules_fallback(obs)
         return {"action": "ignore", "reasoning": "fallback"}
@@ -171,74 +173,104 @@ def env_step(session_id: str, action: dict) -> dict:
     return r.json()
 
 
+# ── Logging helpers (match example format exactly) ────────────────────────────
+def log_start(task: str, env: str, model: str) -> None:
+    print(f"[START] task={task} env={env} model={model}", flush=True)
+
+
+def log_step(step: int, action: str, reward: float, done: bool, error=None) -> None:
+    error_val = error if error else "null"
+    done_val = str(done).lower()
+    print(f"[STEP] step={step} action={action} reward={reward:.2f} done={done_val} error={error_val}", flush=True)
+
+
+def log_end(success: bool, steps: int, score: float, rewards: list) -> None:
+    rewards_str = ",".join(f"{r:.2f}" for r in rewards)
+    print(f"[END] success={str(success).lower()} steps={steps} score={score:.2f} rewards={rewards_str}", flush=True)
+
+
 def run_episode(task_id: int, seed: int = SEED) -> float:
+    # ── Reset ─────────────────────────────────────────────────────────────
     try:
         reset_data = env_reset(task_id, seed)
         session_id = reset_data["session_id"]
         obs        = reset_data["observation"]
-        case_id    = reset_data["info"]["case_id"]
-        difficulty = reset_data["info"]["difficulty"]
     except Exception as e:
-        print(f"[START] task=geoshield env=geoshield model={MODEL_NAME}", flush=True)
-        print(f"[STEP] step=1 action=ignore reward=0.02 done=true error=reset_failed", flush=True)
-        print(f"[END] success=false steps=1 rewards=0.02", flush=True)
-        return 0.02
+        # FIX #7: error-path [END] must also have correct format
+        log_start(task="geoshield", env="geoshield", model=MODEL_NAME)
+        log_step(step=1, action="ignore", reward=0.0, done=True, error="reset_failed")
+        log_end(success=False, steps=1, score=0.0, rewards=[0.0])
+        return 0.0
 
-    print(f"[START] task=geoshield env=geoshield model={MODEL_NAME}", flush=True)
+    log_start(task="geoshield", env="geoshield", model=MODEL_NAME)
 
-    total_reward = 0.02
+    total_score  = 0.0
     done         = False
     step_num     = 0
     rewards_list = []
 
+    # ── Step loop ─────────────────────────────────────────────────────────
     try:
         while not done and step_num < MAX_STEPS:
             step_num += 1
-            user_prompt  = build_user_prompt(obs)
-            action       = call_llm(user_prompt, obs)
+            user_prompt = build_user_prompt(obs)
+            action      = call_llm(user_prompt, obs)
 
-            step_data    = env_step(session_id, action)
-            raw_reward   = step_data.get("reward", 0.02)
-            reward       = clamp(raw_reward)
-            done         = step_data.get("done", True)
-            info         = step_data.get("info", {})
-            obs          = step_data.get("observation", obs)
-            raw_total    = info.get("total_score", reward)
-            total_reward = clamp(raw_total)
+            step_data  = env_step(session_id, action)
+            reward     = clamp(step_data.get("reward", 0.0))
+            done       = step_data.get("done", True)
+            info       = step_data.get("info", {})
+            obs        = step_data.get("observation", obs)
+            total_score = clamp(info.get("total_score", reward))
 
             rewards_list.append(reward)
 
-            print(f"[STEP] step={step_num} action={action.get('action','')} reward={reward:.2f} done={str(done).lower()} error=null", flush=True)
+            log_step(
+                step=step_num,
+                action=action.get("action", ""),
+                reward=reward,
+                done=done,
+                error=None,
+            )
 
             if not done:
                 time.sleep(0.5)
 
     except Exception as e:
-        rewards_list.append(0.02)
-        print(f"[STEP] step={step_num} action=ignore reward=0.02 done=true error={str(e)}", flush=True)
-        total_reward = 0.02
+        rewards_list.append(0.0)
+        log_step(
+            step=step_num,
+            action="ignore",
+            reward=0.0,
+            done=True,
+            error=str(e),
+        )
+        total_score = 0.0
 
-    rewards_str = f"{total_reward:.4f}"
-    success = total_reward >= 0.5
-    print(f"[END] success={str(success).lower()} steps={step_num} rewards={rewards_str}", flush=True)
-    return total_reward
+    # ── FIX #2 #3 #4 #5: correct [END] with score= field & comma-separated rewards ──
+    score = clamp(total_score)
+    success = score >= 0.5
+    log_end(success=success, steps=step_num, score=score, rewards=rewards_list)
+    return score
 
 
 def main():
+    # FIX #1: initialize results dict
+    results = {}
+
     for task_id in TASKS:
         try:
             score = run_episode(task_id, seed=SEED)
             results[f"task_{task_id}"] = clamp(score)
         except Exception as e:
-            print(f"[START] task=geoshield env=geoshield model={MODEL_NAME}", flush=True)
-            print(f"[STEP] step=1 action=ignore reward=0.02 done=true error={str(e)}", flush=True)
-            print(f"[END] success=false steps=1 rewards=0.02", flush=True)
-            results[f"task_{task_id}"] = 0.02
+            log_start(task="geoshield", env="geoshield", model=MODEL_NAME)
+            log_step(step=1, action="ignore", reward=0.0, done=True, error=str(e))
+            log_end(success=False, steps=1, score=0.0, rewards=[0.0])
+            results[f"task_{task_id}"] = 0.0
         time.sleep(1)
 
-    overall = clamp(sum(results.values()) / len(results))
+    overall = clamp(sum(results.values()) / len(results)) if results else 0.0
     results["overall"] = overall
-
 
 
 if __name__ == "__main__":
