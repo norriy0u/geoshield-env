@@ -225,8 +225,6 @@ def run_episode(task_id: int, seed: int = SEED) -> float:
 
 
 def main():
-    print(f"[START] task=geoshield env=geoshield model={MODEL_NAME}", flush=True)
-
     results = {}
     for task_id in TASKS:
         try:
