@@ -218,14 +218,13 @@ def run_episode(task_id: int, seed: int = SEED) -> float:
         print(f"[STEP] step={step_num} action=ignore reward=0.02 done=true error={str(e)}", flush=True)
         total_reward = 0.02
 
-    rewards_str = ",".join(f"{r:.2f}" for r in rewards_list) if rewards_list else "0.02"
+    rewards_str = f"{total_reward:.4f}"
     success = total_reward >= 0.5
     print(f"[END] success={str(success).lower()} steps={step_num} rewards={rewards_str}", flush=True)
     return total_reward
 
 
 def main():
-    results = {}
     for task_id in TASKS:
         try:
             score = run_episode(task_id, seed=SEED)
