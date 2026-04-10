@@ -6,11 +6,11 @@ from src.geoshield.server.generators import sample_case
 from src.geoshield.server.graders import GRADERS
 
 
-def _clamp(score) -> float:
+def _clamp(score: float) -> float:
     try:
-        return round(max(0.01, min(0.99, float(score))), 4)
+        return round(max(0.02, min(0.98, float(score))), 4)
     except Exception:
-        return 0.01
+        return 0.02
 
 
 class GeoShieldEnvironment:
