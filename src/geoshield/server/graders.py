@@ -133,11 +133,11 @@ def grade_task3(action: GeoShieldAction, case: Dict[str, Any]) -> GeoReward:
         },
     )
 
-
 def grade_task4(action: GeoShieldAction, case: Dict[str, Any]) -> GeoReward:
-    gold_action    = case.get("gold_action")
-    gold_cover     = case.get("gold_cover_story", "")
+    gold_action = case.get("gold_action")
+    gold_cover = case.get("gold_cover_story", "")
     gold_deception = case.get("gold_deception_type", "")
+    is_legit_case = (gold_action == "legitimate_activity")
 
     if action.action == gold_action:
         class_score = 0.99
@@ -146,24 +146,30 @@ def grade_task4(action: GeoShieldAction, case: Dict[str, Any]) -> GeoReward:
     else:
         class_score = 0.01
 
-    identified_cover = (action.cover_story_identified or "").lower()
-    cover_keywords   = gold_cover.lower().split()
-    hits = sum(1 for kw in cover_keywords if len(kw) > 4 and kw in identified_cover)
-    if hits >= 3:   cover_score = 0.99
-    elif hits >= 2: cover_score = 0.70
-    elif hits >= 1: cover_score = 0.40
-    else:           cover_score = 0.01
+    # For legitimate cases, cover/deception scoring is N/A — reward correctly
+    if is_legit_case:
+        cover_score = 0.99 if action.action == "legitimate_activity" else 0.01
+        deception_score = 0.99 if action.action == "legitimate_activity" else 0.01
+        hits = 0
+    else:
+        identified_cover = (action.cover_story_identified or "").lower()
+        cover_keywords = gold_cover.lower().split()
+        hits = sum(1 for kw in cover_keywords if len(kw) > 4 and kw in identified_cover)
+        if hits >= 3: cover_score = 0.99
+        elif hits >= 2: cover_score = 0.70
+        elif hits >= 1: cover_score = 0.40
+        else: cover_score = 0.01
 
-    deception_score = 0.01
-    if action.deception_type and gold_deception:
-        if action.deception_type == gold_deception:
-            deception_score = 0.99
-        elif action.deception_type in DECEPTION_TYPES:
-            deception_score = 0.30
+        deception_score = 0.01
+        if action.deception_type and gold_deception:
+            if action.deception_type == gold_deception:
+                deception_score = 0.99
+            elif action.deception_type in DECEPTION_TYPES:
+                deception_score = 0.30
 
-    reasoning       = action.reasoning or ""
+    reasoning = action.reasoning or ""
     reasoning_score = 0.10
-    if len(reasoning) > 50:  reasoning_score += 0.10
+    if len(reasoning) > 50: reasoning_score += 0.10
     if len(reasoning) > 150: reasoning_score += 0.15
     if len(reasoning) > 300: reasoning_score += 0.15
     keyword_hits = sum(1 for kw in STRATEGIC_KEYWORDS if kw.lower() in reasoning.lower())
@@ -177,22 +183,33 @@ def grade_task4(action: GeoShieldAction, case: Dict[str, Any]) -> GeoReward:
         + 0.15 * deception_score
         + 0.20 * reasoning_score
     )
+
+    # ---- FIX: extract nested expressions before f-string (Python 3.11 backslash restriction) ----
+    class_label = "correct" if class_score > 0.5 else "incorrect"
+    deception_label = "correct" if deception_score > 0.5 else "incorrect"
+    cover_detail = (
+        "Legitimate case — no cover story expected."
+        if is_legit_case
+        else f"Cover: {hits} hits. Deception: {deception_label}."
+    )
+
     return GeoReward(
         score=final,
         feedback=(
-            f"Classification: {'correct' if class_score > 0.5 else 'incorrect'} "
-            f"(expected '{gold_action}'). Cover: {hits} hits. "
-            f"Deception: {'correct' if deception_score > 0.5 else 'incorrect'}. "
+            f"Classification: {class_label} "
+            f"(expected '{gold_action}'). "
+            f"{cover_detail} "
             f"Reasoning: {len(reasoning)} chars."
         ),
         breakdown={
             "classification_score": class_score,
-            "cover_story_score":    cover_score,
+            "cover_story_score": cover_score,
             "deception_type_score": deception_score,
-            "reasoning_score":      reasoning_score,
-            "final_score":          final,
+            "reasoning_score": reasoning_score,
+            "final_score": final,
         },
     )
+
 
 
 GRADERS = {
