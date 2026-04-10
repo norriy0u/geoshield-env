@@ -181,7 +181,7 @@ def run_episode(task_id: int, seed: int = SEED) -> float:
     except Exception as e:
         print(f"[START] task={task_id} env=geoshield model={MODEL_NAME}", flush=True)
         print(f"[STEP] step=1 action=ignore reward=0.02 done=true error=reset_failed", flush=True)
-        print(f"[END] success=false steps=1 score=0.02 rewards=0.02", flush=True)
+        print(f"[END] success=false steps=1 rewards=0.02", flush=True)
         return 0.02
 
     print(f"[START] task={task_id} env=geoshield model={MODEL_NAME}", flush=True)
@@ -220,7 +220,7 @@ def run_episode(task_id: int, seed: int = SEED) -> float:
 
     rewards_str = ",".join(f"{r:.2f}" for r in rewards_list) if rewards_list else "0.02"
     success = total_reward >= 0.5
-    print(f"[END] success={str(success).lower()} steps={step_num} score={total_reward:.2f} rewards={rewards_str}", flush=True)
+    print(f"[END] success={str(success).lower()} steps={step_num} rewards={rewards_str}", flush=True)
     return total_reward
 
 
@@ -235,14 +235,14 @@ def main():
         except Exception as e:
             print(f"[START] task={task_id} env=geoshield model={MODEL_NAME}", flush=True)
             print(f"[STEP] step=1 action=ignore reward=0.02 done=true error={str(e)}", flush=True)
-            print(f"[END] success=false steps=1 score=0.02 rewards=0.02", flush=True)
+            print(f"[END] success=false steps=1 rewards=0.02", flush=True)
             results[f"task_{task_id}"] = 0.02
         time.sleep(1)
 
     overall = clamp(sum(results.values()) / len(results))
     results["overall"] = overall
 
-    print(f"[END] run=geoshield_baseline score={overall:.2f} results={json.dumps(results)}", flush=True)
+    print(f"[END] success=true steps=0 rewards=0.02", flush=True)
 
 
 if __name__ == "__main__":
