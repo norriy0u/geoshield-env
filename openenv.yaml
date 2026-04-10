@@ -30,7 +30,7 @@ tasks:
       report: string
       context: string
       hint: string
-    reward_range: [0.01, 0.99]
+    reward_range: [0.02, 0.98]
     max_steps: 2
     cases: 30
 
@@ -52,7 +52,7 @@ tasks:
       context: string
       threat_level: integer
       hint: string
-    reward_range: [0.01, 0.99]
+    reward_range: [0.02, 0.98]
     max_steps: 3
     cases: 30
 
@@ -77,7 +77,7 @@ tasks:
       investigation_results: dict
       steps_remaining: integer
       hint: string
-    reward_range: [0.01, 0.99]
+    reward_range: [0.02, 0.98]
     max_steps: 6
     cases: 30
 
@@ -101,7 +101,7 @@ tasks:
       deception_indicators: list[string]
       steps_remaining: integer
       hint: string
-    reward_range: [0.01, 0.99]
+    reward_range: [0.02, 0.98]
     max_steps: 4
     cases: 30
 
