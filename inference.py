@@ -179,12 +179,12 @@ def run_episode(task_id: int, seed: int = SEED) -> float:
         case_id    = reset_data["info"]["case_id"]
         difficulty = reset_data["info"]["difficulty"]
     except Exception as e:
-        print(f"[START] task={task_id} env=geoshield model={MODEL_NAME}", flush=True)
+        print(f"[START] task=geoshield env=geoshield model={MODEL_NAME}", flush=True)
         print(f"[STEP] step=1 action=ignore reward=0.02 done=true error=reset_failed", flush=True)
         print(f"[END] success=false steps=1 rewards=0.02", flush=True)
         return 0.02
 
-    print(f"[START] task={task_id} env=geoshield model={MODEL_NAME}", flush=True)
+    print(f"[START] task=geoshield env=geoshield model={MODEL_NAME}", flush=True)
 
     total_reward = 0.02
     done         = False
@@ -225,7 +225,7 @@ def run_episode(task_id: int, seed: int = SEED) -> float:
 
 
 def main():
-    print(f"[START] run=geoshield_baseline model={MODEL_NAME} tasks={TASKS}", flush=True)
+    print(f"[START] task=geoshield env=geoshield model={MODEL_NAME}", flush=True)
 
     results = {}
     for task_id in TASKS:
@@ -233,7 +233,7 @@ def main():
             score = run_episode(task_id, seed=SEED)
             results[f"task_{task_id}"] = clamp(score)
         except Exception as e:
-            print(f"[START] task={task_id} env=geoshield model={MODEL_NAME}", flush=True)
+            print(f"[START] task=geoshield env=geoshield model={MODEL_NAME}", flush=True)
             print(f"[STEP] step=1 action=ignore reward=0.02 done=true error={str(e)}", flush=True)
             print(f"[END] success=false steps=1 rewards=0.02", flush=True)
             results[f"task_{task_id}"] = 0.02
