@@ -52,6 +52,10 @@ def clamp(score) -> float:
         return 0.01
 
 
+def sanitize_error(e) -> str:
+    return str(e).replace(" ", "_").replace("\n", "").replace("\r", "")[:60]
+
+
 def rules_fallback(obs: dict) -> dict:
     task_id = obs.get("task_id", 1)
     actions = obs.get("available_actions", [])
@@ -133,7 +137,7 @@ def build_user_prompt(obs: dict) -> str:
 def call_llm(user_prompt: str, obs: dict = None) -> dict:
     try:
         if not HF_TOKEN:
-            raise ValueError("No API token available")
+            raise ValueError("no_token")
         response = client.chat.completions.create(
             model=MODEL_NAME,
             max_tokens=512,
@@ -147,7 +151,7 @@ def call_llm(user_prompt: str, obs: dict = None) -> dict:
         raw = raw.replace("```json", "").replace("```", "").strip()
         return json.loads(raw)
     except Exception as e:
-        print(f"[ERROR] llm_error={e} using_fallback=true", file=sys.stderr, flush=True)
+        print(f"[ERROR] llm_error={sanitize_error(e)} using_fallback=true", file=sys.stderr, flush=True)
         if obs is not None:
             return rules_fallback(obs)
         return {"action": "ignore", "reasoning": "fallback"}
@@ -167,19 +171,17 @@ def env_step(session_id: str, action: dict) -> dict:
 
 
 def run_episode(task_id: int, seed: int = SEED) -> float:
+    print(f"[START] task={task_id} env=geoshield model={MODEL_NAME}", flush=True)
+
     try:
         reset_data = env_reset(task_id, seed)
         session_id = reset_data["session_id"]
         obs        = reset_data["observation"]
-        case_id    = reset_data["info"]["case_id"]
-        difficulty = reset_data["info"]["difficulty"]
     except Exception as e:
-        print(f"[START] task={task_id} env=geoshield model={MODEL_NAME}", flush=True)
-        print(f"[STEP] step=1 action=ignore reward=0.01 done=true error=reset_failed", flush=True)
+        err = sanitize_error(e)
+        print(f"[STEP] step=1 action=ignore reward=0.01 done=true error={err}", flush=True)
         print(f"[END] success=false steps=1 rewards=0.01", flush=True)
         return 0.01
-
-    print(f"[START] task={task_id} env=geoshield model={MODEL_NAME}", flush=True)
 
     total_reward = 0.01
     done         = False
@@ -209,13 +211,14 @@ def run_episode(task_id: int, seed: int = SEED) -> float:
                 time.sleep(0.5)
 
     except Exception as e:
+        err = sanitize_error(e)
         rewards_list.append(0.01)
-        print(f"[STEP] step={step_num} action=ignore reward=0.01 done=true error={str(e)}", flush=True)
+        print(f"[STEP] step={step_num or 1} action=ignore reward=0.01 done=true error={err}", flush=True)
         total_reward = 0.01
 
     rewards_str = ",".join(f"{r:.2f}" for r in rewards_list) if rewards_list else "0.01"
     success = total_reward >= 0.5
-    print(f"[END] success={str(success).lower()} steps={step_num} rewards={rewards_str}", flush=True)
+    print(f"[END] success={str(success).lower()} steps={step_num or 1} rewards={rewards_str}", flush=True)
     return total_reward
 
 
@@ -224,8 +227,9 @@ def main():
         try:
             run_episode(task_id, seed=SEED)
         except Exception as e:
+            err = sanitize_error(e)
             print(f"[START] task={task_id} env=geoshield model={MODEL_NAME}", flush=True)
-            print(f"[STEP] step=1 action=ignore reward=0.01 done=true error={str(e)}", flush=True)
+            print(f"[STEP] step=1 action=ignore reward=0.01 done=true error={err}", flush=True)
             print(f"[END] success=false steps=1 rewards=0.01", flush=True)
         time.sleep(1)
 
