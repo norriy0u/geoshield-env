@@ -1,4 +1,4 @@
-﻿---
+---
 title: GeoShield
 colorFrom: blue
 colorTo: green
@@ -18,7 +18,7 @@ tags:
 
 GeoShield is a **real-world OpenEnv environment** where an AI agent acts as a **Defense Zone Commander**. The agent receives textual intelligence reports — simulating the output of a Vision-Language Model (like Meta's Llama Vision + SAM 2) analyzing satellite imagery — and must make fast, accurate strategic decisions.
 
-This environment models a genuine operational challenge faced by modern defense analysts: processing high volumes of satellite intelligence, filtering false alarms, classifying threats, and allocating scarce reconnaissance assets across multiple simultaneous incidents.
+This environment models a genuine operational challenge faced by modern defense analysts: processing high volumes of satellite intelligence, filtering false alarms, classifying threats, allocating scarce reconnaissance assets, and unmasking covert operations hidden behind civilian cover stories.
 
 ---
 
@@ -36,7 +36,7 @@ GeoShield trains agents to perform the **Strategic Command Interface** layer —
 ---
 
 ## Environment Architecture
-'''
+```
 Satellite Image
 │
 ▼
@@ -49,8 +49,8 @@ Text Intelligence Report
 [GeoShield Agent] ← THIS is what we train
 │
 ▼
-Strategic Decision (ignore / classify / deploy)
-'''
+Strategic Decision (ignore / classify / deploy / unmask)
+```
 ---
 
 ## Tasks
@@ -63,10 +63,9 @@ Strategic Decision (ignore / classify / deploy)
 | Difficulty | Easy |
 | Max Steps | 2 |
 | Actions | `ignore`, `flag_for_review` |
-| Reward | Binary: 0.99 correct, 0.01 incorrect |
+| Reward | Partial credit: 0.99 correct; 0.20 for medium wrong; 0.35 for hard wrong; 0.01 for easy wrong |
 
-**Example observation:**
-**Expected action:** `ignore`
+**Expected action:** `ignore` or `flag_for_review`
 
 ---
 
@@ -79,32 +78,29 @@ Strategic Decision (ignore / classify / deploy)
 | Max Steps | 3 |
 | Actions | `troop_movement`, `illegal_construction`, `unauthorized_aircraft`, `weapons_cache`, `civilian_activity` |
 | Extra fields | `threat_level` (int 1–10) |
-| Reward | Partial: 0.5 classification + 0.5 threat level proximity |
+| Reward | 0.5 × classification score + 0.5 × threat level proximity |
 
-**Example observation:**
 **Expected action:** `illegal_construction` with `threat_level: 7`
 
 **Partial credit logic:**
 - Exact classification match → 0.99 classification score
-- Related classification (e.g. weapons_cache for troop_movement) → partial score
+- Related classification (e.g. weapons_cache for troop_movement) → 0.45 score
 - Threat level within ±1 → 0.80 level score
 - Threat level within ±2 → 0.60 level score
 
 ---
 
 ### Task 3 — Multi-Zone Drone Allocation (Hard)
-- **Task 4** (Ultra): Covert Operation Detection � unmask facilities using civilian cover stories to hide weapons/military activity
-**Objective:** Receive simultaneous reports from 3 sectors, deploy ONE drone to the highest priority sector, and explain the strategic reasoning.
+**Objective:** Receive simultaneous reports from 3 sectors, optionally investigate one sector, then deploy ONE drone to the highest priority sector with strategic reasoning.
 
 | Field | Value |
 |-------|-------|
 | Difficulty | Hard |
-| Max Steps | 4 |
-| Actions | `deploy_to_sector_a`, `deploy_to_sector_b`, `deploy_to_sector_c` |
-| Extra fields | `target_sector` (str), `reasoning` (str, min 100 chars) |
-| Reward | 0.5 sector selection + 0.5 reasoning quality |
+| Max Steps | 6 |
+| Actions | `deploy_to_sector_a/b/c`, `investigate_sector_a/b/c` |
+| Extra fields | `reasoning` (str) |
+| Reward | 0.5 × sector selection + 0.5 × reasoning quality |
 
-**Example observation:**
 **Expected action:** `deploy_to_sector_b` with strategic reasoning paragraph
 
 **Reasoning scoring:**
@@ -114,7 +110,29 @@ Strategic Decision (ignore / classify / deploy)
 - 3+ strategic keywords → +0.10
 - 5+ strategic keywords → +0.10
 
-This mechanic forces the agent to **think before acting** — mirroring real SOC analyst workflows where decisions must be documented.
+This mechanic forces the agent to **think before acting** — mirroring real SOC analyst workflows where decisions must be documented. Agents may spend a step investigating a sector before committing to deployment.
+
+---
+
+### Task 4 — Covert Operation Detection (Ultra)
+**Objective:** Identify facilities using civilian cover stories to conceal military or weapons-related activity. Agents must classify the facility, identify the cover story, name the deception type, and provide strategic reasoning. Agents may request additional verification before making a final call.
+
+| Field | Value |
+|-------|-------|
+| Difficulty | Ultra |
+| Max Steps | 4 |
+| Actions | `covert_operation`, `legitimate_activity`, `request_verification` |
+| Extra fields | `cover_story_identified` (str), `deception_type` (str), `reasoning` (str) |
+| Reward | 0.40 × classification + 0.25 × cover story + 0.15 × deception type + 0.20 × reasoning |
+
+**Deception types:** `civilian_military`, `commercial_weapons`, `construction_fortification`, `logistics_supply`, `research_weapons`
+
+**Reward design:**
+- Correct `covert_operation` or `legitimate_activity` → 0.99 classification score
+- `request_verification` on a covert case → 0.50 (partial credit for caution)
+- Cover story keyword matching: 3+ hits → 0.99, 2 hits → 0.70, 1 hit → 0.40
+- Exact deception type match → 0.99; valid but wrong type → 0.30
+- For legitimate cases, cover/deception scoring is N/A and rewards correct identification at full value
 
 ---
 
@@ -122,16 +140,19 @@ This mechanic forces the agent to **think before acting** — mirroring real SOC
 
 ```python
 class GeoObservation(BaseModel):
-    task_id: int                          # 1, 2, or 3
-    case_id: str                          # unique case identifier
-    step: int                             # current step number
-    difficulty: str                       # "easy" | "medium" | "hard"
-    report: Optional[str]                 # intelligence report text (Task 1 & 2)
-    context: Optional[str]                # situational context (Task 1 & 2)
-    sectors: Optional[List[SectorReport]] # multi-sector reports (Task 3)
-    available_actions: List[str]          # valid actions for this task
-    available_assets: Optional[str]       # available assets (Task 3)
-    hint: Optional[str]                   # task instruction hint
+    task_id: int                               # 1, 2, 3, or 4
+    case_id: str                               # unique case identifier
+    step: int                                  # current step number
+    difficulty: str                            # "easy" | "medium" | "hard" | "ultra"
+    report: Optional[str]                      # intelligence report text (Tasks 1, 2, 4)
+    context: Optional[str]                     # situational context (Tasks 1, 2, 4)
+    sectors: Optional[List[SectorReport]]      # multi-sector reports (Task 3)
+    available_actions: List[str]               # valid actions for this task
+    available_assets: Optional[str]            # available assets (Task 3)
+    hint: Optional[str]                        # task instruction hint
+    deception_indicators: Optional[List[str]]  # deception signals (Task 4)
+    investigation_results: Optional[dict]      # results of investigate action (Task 3)
+    steps_remaining: Optional[int]             # steps left in episode (Tasks 3 & 4)
 ```
 
 ```python
@@ -150,29 +171,34 @@ class SectorReport(BaseModel):
 
 ```python
 class GeoShieldAction(BaseModel):
-    action: str                      # required — the primary decision
-    threat_level: Optional[int]      # Task 2 only — severity 1-10
-    target_sector: Optional[str]     # Task 3 only — chosen sector id
-    reasoning: Optional[str]         # Task 3 only — strategic reasoning
+    action: str                          # required — the primary decision
+    threat_level: Optional[int]          # Task 2 only — severity 1-10
+    target_sector: Optional[str]         # Task 3 only — chosen sector id
+    reasoning: Optional[str]             # Tasks 3 & 4 — strategic reasoning
+    cover_story_identified: Optional[str] # Task 4 only — the civilian cover being used
+    deception_type: Optional[str]        # Task 4 only — category of deception
 ```
 
 **Task 1 valid actions:** `ignore`, `flag_for_review`
 
 **Task 2 valid actions:** `troop_movement`, `illegal_construction`, `unauthorized_aircraft`, `weapons_cache`, `civilian_activity`
 
-**Task 3 valid actions:** `deploy_to_sector_a`, `deploy_to_sector_b`, `deploy_to_sector_c`
+**Task 3 valid actions:** `deploy_to_sector_a`, `deploy_to_sector_b`, `deploy_to_sector_c`, `investigate_sector_a`, `investigate_sector_b`, `investigate_sector_c`
+
+**Task 4 valid actions:** `covert_operation`, `legitimate_activity`, `request_verification`
 
 ---
 
 ## Reward Function
 
-All rewards are strictly in **(0.01, 0.99)** — never exactly 0 or 1.
+All rewards are strictly in **[0.0, 1.0]** — clamped to (0.01, 0.99) in practice.
 
 | Task | Reward Logic |
 |------|-------------|
-| Task 1 | Binary: 0.99 correct, 0.01 incorrect |
+| Task 1 | Partial: 0.99 correct; 0.35 hard wrong; 0.20 medium wrong; 0.01 easy wrong |
 | Task 2 | 0.5 × classification score + 0.5 × threat level proximity score |
 | Task 3 | 0.5 × sector selection + 0.5 × reasoning quality (length + keywords) |
+| Task 4 | 0.40 × classification + 0.25 × cover story + 0.15 × deception type + 0.20 × reasoning |
 
 **Step penalties:** Invalid actions receive 0.01 reward immediately.
 
@@ -182,15 +208,15 @@ All rewards are strictly in **(0.01, 0.99)** — never exactly 0 or 1.
 
 ## Baseline Scores
 
-| Agent | Task 1 | Task 2 | Task 3 | Overall |
-|-------|--------|--------|--------|---------|
-| Random Agent | ~0.50 | ~0.30 | ~0.25 | ~0.35 |
-| Rules Agent | ~0.75 | ~0.55 | ~0.55 | ~0.62 |
-| LLM Agent (Qwen2.5-72B) | ~0.85 | ~0.70 | ~0.60 | ~0.72 |
+| Agent | Task 1 | Task 2 | Task 3 | Task 4 | Overall |
+|-------|--------|--------|--------|--------|---------|
+| Random Agent | ~0.35 | ~0.22 | ~0.18 | ~0.15 | ~0.23 |
+| Rules Agent | ~0.72 | ~0.58 | ~0.51 | ~0.40 | ~0.55 |
+| LLM Agent (Qwen2.5-72B) | ~0.89 | ~0.74 | ~0.68 | ~0.61 | ~0.73 |
 
-Frontier models (GPT-4, Claude) expected to score ~0.90 on Task 1, ~0.80 on Task 2, ~0.65 on Task 3.
+Frontier models (GPT-4, Claude) expected to score ~0.92 on Task 1, ~0.82 on Task 2, ~0.72 on Task 3, ~0.65 on Task 4.
 
-Task 3 is intentionally designed to challenge frontier models — the multi-sector ambiguous scenarios require genuine strategic reasoning that resists simple pattern matching.
+Task 4 is intentionally the hardest — covert operation detection requires multi-signal reasoning about deception patterns that resists simple keyword matching.
 
 ---
 
@@ -279,10 +305,12 @@ python baselines/rules_agent.py
 ### Step Request
 ```json
 {
-  "action": "flag_for_review",
+  "action": "covert_operation",
   "threat_level": 8,
   "target_sector": "sector_b",
   "reasoning": "Strategic reasoning here...",
+  "cover_story_identified": "agricultural research facility",
+  "deception_type": "research_weapons",
   "session_id": "your-session-id"
 }
 ```
@@ -294,7 +322,7 @@ python baselines/rules_agent.py
   "reward": 0.85,
   "done": true,
   "info": {
-    "feedback": "Correct! 'flag_for_review' matches gold action.",
+    "feedback": "Correct classification. Cover: 3 hits. Deception: correct. Reasoning: 287 chars.",
     "breakdown": {...},
     "step": 1,
     "total_score": 0.85
@@ -305,7 +333,7 @@ python baselines/rules_agent.py
 ---
 
 ## Project Structure
-'''
+```
 geoshield-env/
 ├── Dockerfile
 ├── requirements.txt
@@ -329,29 +357,32 @@ geoshield-env/
 │   ├── task1_train.jsonl  (30 cases)
 │   ├── task2_train.jsonl  (30 cases)
 │   ├── task3_train.jsonl  (30 cases)
+│   ├── task4_train.jsonl  (30 cases)
 │   ├── task1_eval.jsonl   (30 cases)
 │   ├── task2_eval.jsonl   (30 cases)
-│   └── task3_eval.jsonl   (30 cases)
+│   ├── task3_eval.jsonl   (30 cases)
+│   └── task4_eval.jsonl   (30 cases)
 └── baselines/
 ├── random_agent.py
 └── rules_agent.py
-'''
+```
 ---
 
 ## Data
 
-180 total cases across 6 splits (3 tasks × train/eval × 30 cases each).
+240 total cases across 8 splits (4 tasks × train/eval × 30 cases each).
 
 Each case includes:
 - Realistic satellite intelligence report text
-- Ground truth action and threat level
-- Difficulty label (easy / medium / hard)
+- Ground truth action, threat level, cover story, and deception type
+- Difficulty label (easy / medium / hard / ultra)
 - Category label for analysis
 
 Cases are designed so that:
 - **Easy cases** are solvable by keyword matching
 - **Medium cases** require contextual reasoning
 - **Hard cases** involve deliberate ambiguity that challenges frontier LLMs
+- **Ultra cases** require multi-signal deception analysis across several data points
 
 ---
 
@@ -368,9 +399,6 @@ Cases are designed so that:
 ## License
 
 MIT License — open for research and agent evaluation use.
-
-
-
 
 
 

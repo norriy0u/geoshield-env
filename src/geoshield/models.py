@@ -35,12 +35,17 @@ class GeoObservation(BaseModel):
     hint: Optional[str] = None
     investigation_results: Optional[dict] = None
     steps_remaining: Optional[int] = None
+    deception_indicators: Optional[List[str]] = None
 
 
 class GeoReward(BaseModel):
-    score: float
+    score: float = Field(..., ge=0.0, le=1.0)
     feedback: str
     breakdown: dict = {}
+
+    def model_post_init(self, __context):
+        # Hard clamp: never touch 0.0 or 1.0 boundaries
+        self.score = round(max(0.02, min(0.98, float(self.score))), 4)
 
 
 class GeoState(BaseModel):
