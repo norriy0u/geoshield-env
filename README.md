@@ -46,20 +46,22 @@ GeoShield trains agents to perform the **Strategic Command Interface** layer —
 ## 🏗 Agent Loop Architecture
 
 ```mermaid
-sequenceDiagram
-    participant S as 🛰 Satellite Sensors
-    participant V as 🔍 VLM (Llama-Vision)
-    participant E as 🛡️ GeoShield Env
-    participant A as 🤖 Agent (LLM)
-    participant G as ⚖️ Heuristic Grader
+flowchart LR
+    classDef input fill:#0f172a,stroke:#334155,color:#f8fafc,rx:8px,ry:8px
+    classDef env fill:#1e3a8a,stroke:#3b82f6,color:#eff6ff,rx:8px,ry:8px
+    classDef agent fill:#4c1d95,stroke:#8b5cf6,color:#f5f3ff,rx:8px,ry:8px
+    classDef grader fill:#064e3b,stroke:#10b981,color:#ecfdf5,rx:8px,ry:8px
 
-    S->>V: Raw Imagery Stream
-    V->>E: Generate Intelligence Report Text
-    E->>A: Provide Observation (geo-context, threat signals)
-    A->>E: Execute Strategic Action (deploy, classify)
-    E->>G: Send Action for Validation
-    G-->>E: Deductive Scoring & Partial Credit
-    E-->>A: Return Reward + Next State
+    subgraph Reality
+        S["🛰️ Satellite Sensors"]:::input -->|"Raw Image"| V["🔍 Vision Model"]:::input
+    end
+
+    subgraph GeoShield Simulation
+        V -->|"Intelligence Text"| E["🛡️ GeoShield Env"]:::env
+        E <-->|"State Observation <br> vs <br> Strategic Action"| A["🤖 AI Agent (LLM)"]:::agent
+        E -->|"Evaluate Action"| G["⚖️ Deterministic Grader"]:::grader
+        G -.->|"Reward (0.0 - 1.0)"| E
+    end
 ```
 
 ---
