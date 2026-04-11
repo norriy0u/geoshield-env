@@ -168,25 +168,7 @@ def delete_session(session_id: str):
     return {"deleted": False, "session_id": session_id}
 
 
-# ── Debug endpoint — remove after fixing ──────────────────────────────────────
-@app.get("/debug")
-def debug():
-    """Quick diagnostic: try to create an env, reset it, and report any errors."""
-    try:
-        env = GeoShieldEnvironment()
-        result = env.reset(task_id=1, seed=42, split="train")
-        return {
-            "status": "ok",
-            "observation_keys": list(result.get("observation", {}).keys()),
-            "state_keys": list(result.get("state", {}).keys()),
-            "case_id": result.get("info", {}).get("case_id"),
-        }
-    except Exception as e:
-        tb = traceback.format_exc()
-        return JSONResponse(
-            status_code=500,
-            content={"status": "error", "error": str(e), "traceback": tb}
-        )
+
 
 
 @app.get("/")
