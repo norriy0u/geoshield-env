@@ -259,3 +259,4 @@ def test_fallback_cases():
         case = _make_fallback_case(task_id)
         assert "gold_action" in case
         assert "id" in case
+
