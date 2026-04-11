@@ -330,10 +330,11 @@ geoshield-env/
 
 ## 🔮 Future Roadmap
 
-- **Procedural Case Generation**: Migrating to dynamic generators that randomize coordinates, timestamps, and threat signatures to prevent benchmark memorization
-- **Multi-Turn Investigation (POMDP)**: Full Partially Observable Markov Decision Process where agents actively invoke `scan_sector()` and `request_intel()` actions
-- **Semantic Grading**: Lightweight Levenshtein-distance metrics for reasoning evaluation while avoiding LLM-as-judge unreliability
-- **50+ Scenarios**: Expanding incident repertoire with edge cases (decoy installations, time-pressure scenarios, coordinated multi-front threats)
+- **Temporal Memory & Intelligence Layers**: Moving beyond episodic triage to instantiate continuous RL loops where agents must maintain a persistent "threat memory bank" across ongoing operations.
+- **Map-Based Spatial Reasoning**: Expanding the sector system into an explicit coordinate grid network. Agents will have to reason spatially, recognizing that a troop buildup in Grid A3 is a flanking maneuver against Sector B2.
+- **Multi-Agent Red-Teaming**: Evolving from single-agent analysis to a multi-agent adversarial framework. A generative 'Red Team' agent actively spawns coordinated deception campaigns while the 'Blue Team' analyst attempts to triage them.
+- **Procedural Case Generation**: Migrating to dynamic generators that randomize coordinates, timestamps, and threat signatures to mathematically guarantee zero benchmark memorization.
+- **Semantic Grading**: Lightweight Levenshtein-distance metrics for reasoning evaluation while strictly avoiding LLM-as-judge unreliability.
 
 ---
 
