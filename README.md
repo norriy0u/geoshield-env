@@ -13,8 +13,8 @@ tags:
 [![Docker](https://img.shields.io/badge/Docker-ready-brightgreen)](./Dockerfile)
 [![Tests](https://img.shields.io/badge/Tests-passing-green)](./tests/)
 
-> **Note**  
-> This is a verified Phase 2 deep-validation submission for the Meta × HuggingFace × Scaler OpenEnv Hackathon 2026.
+> **Hackathon Submission**  
+> Developed for the 2026 Meta × HuggingFace × Scaler OpenEnv competition. All automated Phase 1 and Phase 2 evaluations successfully passed.
 
 > **Tip**  
 > Live deployed version: [https://norriy0u-geoshield-env.hf.space](https://norriy0u-geoshield-env.hf.space)
@@ -46,34 +46,25 @@ GeoShield trains agents to perform the **Strategic Command Interface** layer —
 ## 🏗 Agent Loop Architecture
 
 ```mermaid
-flowchart TD
-    classDef config fill:#1f2937,stroke:#6b7280,color:#f9fafb
-    classDef env fill:#7f1d1d,stroke:#b91c1c,color:#fef2f2
-    classDef obs fill:#1e3a5f,stroke:#3b82f6,color:#dbeafe
-    classDef agent fill:#3b0764,stroke:#9333ea,color:#f3e8ff
-    classDef step fill:#78350f,stroke:#f59e0b,color:#fef3c7
-    classDef score fill:#14532d,stroke:#4ade80,color:#bbf7d0
+sequenceDiagram
+    participant S as 🛰 Satellite Sensors
+    participant V as 🔍 VLM (Llama-Vision)
+    participant E as 🛡️ GeoShield Env
+    participant A as 🤖 Agent (LLM)
+    participant G as ⚖️ Heuristic Grader
 
-    SAT["🛰 Satellite Image"]:::config
-    SAT -->|"SAM 2 + Llama Vision"| VLM["🔍 Vision-Language Model<br>Produces text intelligence report"]:::config
-    VLM --> OBS["📡 Observation<br>• Intelligence Report<br>• Sector Reports<br>• Deception Indicators"]:::obs
-    OBS -->|"observation"| AGT["🤖 GeoShield Agent<br>LLM (Qwen, Llama, etc.)"]:::agent
-    AGT -->|"GeoShieldAction"| STEP["⚡ env.step()<br>Agent submits decision"]:::step
-    STEP --> GRD["🏁 Deterministic Grader<br>Score 0.02 – 0.98"]:::score
-    GRD -->|"reward + feedback"| OBS
+    S->>V: Raw Imagery Stream
+    V->>E: Generate Intelligence Report Text
+    E->>A: Provide Observation (geo-context, threat signals)
+    A->>E: Execute Strategic Action (deploy, classify)
+    E->>G: Send Action for Validation
+    G-->>E: Deductive Scoring & Partial Credit
+    E-->>A: Return Reward + Next State
 ```
 
 ---
 
 ## 📊 Baseline Inference Leaderboard
-
-```mermaid
-xychart-beta
-    title "GeoShield Score by Model (0-Shot)"
-    x-axis ["Qwen-72B", "Rules Agent", "Random"]
-    y-axis "Average Score" 0.00 --> 1.00
-    bar [0.73, 0.55, 0.23]
-```
 
 | Agent | Task 1 (Easy) | Task 2 (Medium) | Task 3 (Hard) | Task 4 (Ultra) | Overall |
 |-------|:---:|:---:|:---:|:---:|:---:|
