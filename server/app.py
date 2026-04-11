@@ -1,4 +1,5 @@
 import os
+import traceback
 from typing import Dict, Optional
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -31,9 +32,7 @@ def get_env(session_id: str) -> GeoShieldEnvironment:
         _sessions[session_id] = GeoShieldEnvironment()
     return _sessions[session_id]
 
-
 # ── Request models ─────────────────────────────────────────────────────────────
-
 class ResetRequest(BaseModel):
     task_id: Optional[int] = 1
     seed: Optional[int] = 42
@@ -56,9 +55,6 @@ class StepRequest(BaseModel):
 
 class StateRequest(BaseModel):
     session_id: str
-
-
-# ── Routes ─────────────────────────────────────────────────────────────────────
 
 @app.get("/health")
 def health():
@@ -96,38 +92,56 @@ def list_tasks():
 
 @app.post("/reset")
 def reset(req: Optional[ResetRequest] = None):
-    if req is None:
-        req = ResetRequest()
-    session_id = req.session_id or str(uuid.uuid4())
-    env = get_env(session_id)
-    result = env.reset(
-        task_id=req.task_id,
-        seed=req.seed,
-        split=req.split,
-    )
-    result["session_id"] = session_id
-    return result
+    try:
+        if req is None:
+            req = ResetRequest()
+        session_id = req.session_id or str(uuid.uuid4())
+        env = get_env(session_id)
+        result = env.reset(
+            task_id=req.task_id,
+            seed=req.seed,
+            split=req.split,
+        )
+        result["session_id"] = session_id
+        return result
+    except Exception as e:
+        tb = traceback.format_exc()
+        print(f"[ERROR] /reset failed: {e}\n{tb}", flush=True)
+        return JSONResponse(
+            status_code=500,
+            content={"detail": str(e), "traceback": tb}
+        )
 
 
 @app.post("/step")
 def step(req: StepRequest):
-    if not req.session_id or req.session_id not in _sessions:
-        raise HTTPException(status_code=400, detail="Invalid or missing session_id. Call /reset first.")
+    try:
+        if not req.session_id or req.session_id not in _sessions:
+            raise HTTPException(status_code=400, detail="Invalid or missing session_id. Call /reset first.")
 
-    env = get_env(req.session_id)
+        env = get_env(req.session_id)
 
-    action_input = {
-        "action": req.action,
-        "threat_level": req.threat_level,
-        "target_sector": req.target_sector,
-        "reasoning": req.reasoning,
-        "cover_story_identified": req.cover_story_identified,
-        "deception_type": req.deception_type,
-    }
+        action_input = {
+            "action": req.action,
+            "threat_level": req.threat_level,
+            "target_sector": req.target_sector,
+            "reasoning": req.reasoning,
+            "cover_story_identified": req.cover_story_identified,
+            "deception_type": req.deception_type,
+        }
 
-    result = env.step(action_input)
-    result["session_id"] = req.session_id
-    return result
+        result = env.step(action_input)
+        result["session_id"] = req.session_id
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        tb = traceback.format_exc()
+        print(f"[ERROR] /step failed: {e}\n{tb}", flush=True)
+        return JSONResponse(
+            status_code=500,
+            content={"detail": str(e), "traceback": tb}
+        )
 
 
 @app.get("/state")
@@ -152,6 +166,27 @@ def delete_session(session_id: str):
         del _sessions[session_id]
         return {"deleted": True, "session_id": session_id}
     return {"deleted": False, "session_id": session_id}
+
+
+# ── Debug endpoint — remove after fixing ──────────────────────────────────────
+@app.get("/debug")
+def debug():
+    """Quick diagnostic: try to create an env, reset it, and report any errors."""
+    try:
+        env = GeoShieldEnvironment()
+        result = env.reset(task_id=1, seed=42, split="train")
+        return {
+            "status": "ok",
+            "observation_keys": list(result.get("observation", {}).keys()),
+            "state_keys": list(result.get("state", {}).keys()),
+            "case_id": result.get("info", {}).get("case_id"),
+        }
+    except Exception as e:
+        tb = traceback.format_exc()
+        return JSONResponse(
+            status_code=500,
+            content={"status": "error", "error": str(e), "traceback": tb}
+        )
 
 
 @app.get("/")
