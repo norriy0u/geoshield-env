@@ -13,14 +13,6 @@ tags:
 [![Docker](https://img.shields.io/badge/Docker-ready-brightgreen)](./Dockerfile)
 [![Tests](https://img.shields.io/badge/Tests-passing-green)](./tests/)
 
-> **Note**  
-> This is a verified Phase 2 deep-validation submission for the Meta × HuggingFace × Scaler OpenEnv Hackathon 2026.
-
-> **Tip**  
-> Live deployed version: [https://norriy0u-geoshield-env.hf.space](https://norriy0u-geoshield-env.hf.space)
-
----
-
 ## Overview
 
 GeoShield is a **real-world OpenEnv environment** where an AI agent acts as a **Defense Zone Commander**. The agent receives textual intelligence reports — simulating the output of a Vision-Language Model (like Meta's Llama Vision + SAM 2) analyzing satellite imagery — and must make fast, accurate strategic decisions.
