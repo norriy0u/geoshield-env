@@ -13,6 +13,14 @@ tags:
 [![Docker](https://img.shields.io/badge/Docker-ready-brightgreen)](./Dockerfile)
 [![Tests](https://img.shields.io/badge/Tests-passing-green)](./tests/)
 
+> **Note**  
+> This is a verified Phase 2 deep-validation submission for the Meta × HuggingFace × Scaler OpenEnv Hackathon 2026.
+
+> **Tip**  
+> Live deployed version: [https://norriy0u-geoshield-env.hf.space](https://norriy0u-geoshield-env.hf.space)
+
+---
+
 ## Overview
 
 GeoShield is a **real-world OpenEnv environment** where an AI agent acts as a **Defense Zone Commander**. The agent receives textual intelligence reports — simulating the output of a Vision-Language Model (like Meta's Llama Vision + SAM 2) analyzing satellite imagery — and must make fast, accurate strategic decisions.
@@ -73,7 +81,7 @@ xychart-beta
 | Rules Agent | 0.72 | 0.58 | 0.51 | 0.40 | 0.55 |
 | Random Agent | 0.35 | 0.22 | 0.18 | 0.15 | 0.23 |
 
-> Frontier models (GPT-4, Claude) expected to score ~0.92 on Task 1, ~0.82 on Task 2, ~0.72 on Task 3, ~0.65 on Task 4. Task 4 is intentionally the hardest — covert operation detection requires multi-signal reasoning that resists simple keyword matching.
+> **Note:** Task 4 is intentionally designed to be the hardest challenge for frontier models — covert operation detection requires multi-signal reasoning that resists simple keyword matching.
 
 ---
 
