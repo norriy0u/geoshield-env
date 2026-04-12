@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GeoShield — Command Center</title>
+    <meta name="description" content="GeoShield Satellite Intelligence Triage Environment — Interactive Command Dashboard for AI Agent Evaluation">
+    <link rel="stylesheet" href="/static/style.css?v=5.0">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+</head>
+<body>
+
+    <!-- ═══ SIDEBAR ═══════════════════════════════════════════════════ -->
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <div class="brand-icon">G</div>
+            <div class="brand-title">
+                <h1>GeoShield</h1>
+                <p>Command Center</p>
+            </div>
+        </div>
+
+        <div class="sidebar-nav">
+            <div class="nav-section-title">Mission Directory</div>
+            <div id="tasks-list">
+                <div style="padding: 20px; color: var(--text-dim); text-align: center; font-size: 0.8rem; font-family: var(--font-mono);">
+                    Connecting to HQ...
+                </div>
+            </div>
+        </div>
+
+        <div class="sidebar-footer">
+            <div class="status-dot"></div>
+            <span>SYSTEMS OPERATIONAL</span>
+        </div>
+    </aside>
+
+    <!-- ═══ MAIN CONTENT ══════════════════════════════════════════════ -->
+    <main class="main-content">
+
+        <!-- Top Bar -->
+        <header class="top-bar">
+            <div class="top-bar-left">
+                <div class="status-indicator">
+                    <div class="status-dot-live"></div>
+                    <span>LIVE</span>
+                </div>
+                <div class="mission-status idle" id="mission-status">STANDBY</div>
+            </div>
+            <div class="top-bar-center">
+                <span class="meta-badge" id="mission-meta">No active mission</span>
+                <span class="steps-badge" id="steps-badge" style="display:none;">—</span>
+            </div>
+            <div class="top-bar-right">
+                <span class="session-badge" id="session-badge">NO SESSION</span>
+                <button class="sound-toggle active" id="sound-toggle" title="Toggle Sound">🔊</button>
+                <span class="clock" id="clock">--:--:--</span>
+            </div>
+        </header>
+
+        <!-- Workspace -->
+        <div class="workspace">
+
+            <!-- LEFT: Observation Feed + Terminal -->
+            <div class="observation-column">
+                <section class="observation-panel" id="observation-panel">
+                    <div class="panel-header">
+                        <div class="panel-title">
+                            <span class="icon">◈</span>
+                            Intelligence Feed
+                        </div>
+                    </div>
+
+                    <div id="observation-display">
+                        <div class="empty-state">
+                            <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                                <path d="M2 12h20"></path>
+                            </svg>
+                            <p>Select a mission from the directory to begin intelligence analysis.</p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Terminal Log -->
+                <div class="terminal-panel">
+                    <div class="terminal-header">
+                        <div class="terminal-title">
+                            <span class="dot"></span>
+                            System Log
+                        </div>
+                        <span style="font-size:0.65rem;color:var(--text-dim);font-family:var(--font-mono);">GEOSHIELD v2.0.0</span>
+                    </div>
+                    <div class="terminal-body" id="terminal-log">
+                        <!-- Log entries injected here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- RIGHT: Command Panel -->
+            <aside class="command-panel">
+
+                <!-- Score Gauge -->
+                <div class="score-section">
+                    <div class="score-gauge" id="score-gauge">
+                        <svg viewBox="0 0 160 160">
+                            <circle class="gauge-track" cx="80" cy="80" r="70" />
+                            <circle class="gauge-fill" id="gauge-fill" cx="80" cy="80" r="70" />
+                        </svg>
+                        <div class="score-number" id="score-val">0.00</div>
+                    </div>
+                    <div class="score-label">Evaluation Score</div>
+                </div>
+
+                <!-- Action Form -->
+                <div class="command-section">
+                    <form id="action-form">
+                        <div class="form-group">
+                            <label for="action-select">Primary Action</label>
+                            <select id="action-select" class="form-control" required disabled>
+                                <option value="">Awaiting mission...</option>
+                            </select>
+                        </div>
+
+                        <div id="dynamic-fields"></div>
+
+                        <button type="submit" id="execute-btn" class="btn-submit" disabled>
+                            ▶ EXECUTE DECISION
+                        </button>
+                    </form>
+
+                    <!-- Feedback (injected after grading) -->
+                    <div id="feedback-container"></div>
+                </div>
+            </aside>
+
+        </div>
+    </main>
+
+    <!-- ═══ MODAL ═════════════════════════════════════════════════════ -->
+    <div id="briefing-modal" class="modal-overlay hidden">
+        <div class="modal-dialog">
+            <div class="modal-icon success" id="modal-icon">✓</div>
+            <h2 id="modal-title">Mission Complete</h2>
+            <div class="score-display" id="modal-score">0.00</div>
+            <p id="modal-desc">Final evaluation score</p>
+            <button id="modal-close" class="btn-submit">Return to Directory</button>
+        </div>
+    </div>
+
+    <script src="/static/app.js?v=5.0"></script>
+</body>
+</html>

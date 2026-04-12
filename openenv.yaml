@@ -1,0 +1,200 @@
+name: geoshield-env
+version: "2.0.0"
+description: >
+  GeoShield is a satellite intelligence triage environment for training and
+  evaluating RL agents on real-world defense analyst workflows. Agents must
+  classify satellite reports, identify threats, allocate surveillance assets,
+  and unmask covert operations hidden behind civilian cover stories.
+  Features procedural case generation for unlimited unique scenarios.
+author: norriy0u
+license: MIT
+tags:
+  - openenv
+  - satellite
+  - intelligence
+  - triage
+  - defense
+  - sigint
+  - procedural-generation
+
+tasks:
+  - id: 1
+    name: false_alarm_detection
+    difficulty: easy
+    description: >
+      Classify satellite scan reports as genuine threats requiring review
+      or false alarms that can be safely ignored. Agents may request
+      additional context before deciding. Multi-step: gather intel then decide.
+    actions:
+      - ignore
+      - flag_for_review
+      - request_context
+    observation_space:
+      report: string
+      context: string
+      hint: string
+      steps_remaining: integer
+    reward_range: [0.02, 0.98]
+    max_steps: 2
+    cases: procedural (unlimited, seed-deterministic)
+
+  - id: 2
+    name: threat_classification
+    difficulty: medium
+    description: >
+      Identify the category of threat detected in a satellite report and
+      rate its severity on a scale of 1-10. Agents may request detailed
+      sensor analysis before classifying. Multi-step: analyze then classify.
+    actions:
+      - troop_movement
+      - illegal_construction
+      - unauthorized_aircraft
+      - weapons_cache
+      - civilian_activity
+      - request_analysis
+    observation_space:
+      report: string
+      context: string
+      threat_level: integer
+      hint: string
+      steps_remaining: integer
+    reward_range: [0.02, 0.98]
+    max_steps: 3
+    cases: procedural (unlimited, seed-deterministic)
+
+  - id: 3
+    name: drone_allocation
+    difficulty: hard
+    description: >
+      Analyze reports from multiple sectors and deploy a single surveillance
+      drone to the highest priority threat. Agents may optionally investigate
+      one sector before committing to a deployment. Reward combines sector
+      selection accuracy with quality of strategic reasoning.
+    actions:
+      - deploy_to_sector_a
+      - deploy_to_sector_b
+      - deploy_to_sector_c
+      - investigate_sector_a
+      - investigate_sector_b
+      - investigate_sector_c
+    observation_space:
+      sectors: list[SectorReport]
+      available_assets: string
+      investigation_results: dict
+      steps_remaining: integer
+      hint: string
+    reward_range: [0.02, 0.98]
+    max_steps: 6
+    cases: procedural (unlimited, seed-deterministic)
+
+  - id: 4
+    name: covert_operation_detection
+    difficulty: ultra
+    description: >
+      Identify facilities using civilian cover stories to conceal military
+      or weapons-related activity. Agents must classify the facility, identify
+      the specific cover story being used, name the deception type, and provide
+      strategic reasoning. Includes red-herring cases that look suspicious but
+      are legitimate. Agents may request additional verification intel
+      before making a final call.
+    actions:
+      - covert_operation
+      - legitimate_activity
+      - request_verification
+    observation_space:
+      report: string
+      context: string
+      deception_indicators: list[string]
+      steps_remaining: integer
+      hint: string
+    reward_range: [0.02, 0.98]
+    max_steps: 4
+    cases: procedural (unlimited, seed-deterministic)
+
+environment:
+  type: docker
+  port: 7860
+  endpoints:
+    reset: POST /reset
+    step: POST /step
+    state: GET /state
+    health: GET /health
+    info: GET /info
+    tasks: GET /tasks
+
+  observation_model: GeoObservation
+  action_model: GeoShieldAction
+  reward_model: GeoReward
+  state_model: GeoState
+
+  features:
+    procedural_generation: true
+    multi_step_episodes: true
+    levenshtein_grading: true
+    negation_filtering: true
+    report_reference_scoring: true
+    false_positive_penalty: true
+    intel_gathering_bonus: true
+
+models:
+  GeoObservation:
+    task_id: integer
+    case_id: string
+    step: integer
+    difficulty: string
+    report: string
+    context: string
+    sectors: list
+    available_actions: list
+    available_assets: string
+    hint: string
+    investigation_results: dict
+    steps_remaining: integer
+
+  GeoShieldAction:
+    action: string
+    threat_level: integer
+    target_sector: string
+    reasoning: string
+    cover_story_identified: string
+    deception_type: string
+
+  GeoReward:
+    score: float
+    feedback: string
+    breakdown: dict
+
+  GeoState:
+    task_id: integer
+    case_id: string
+    completed: boolean
+    step: integer
+    rewards: list
+    total_score: float
+    difficulty: string
+    investigation_used: boolean
+    drone_deployed: boolean
+
+baselines:
+  random_agent:
+    task_1: 0.46
+    task_2: 0.36
+    task_3: 0.18
+    task_4: 0.26
+    overall: 0.32
+
+  rules_agent:
+    task_1: 0.66
+    task_2: 0.67
+    task_3: 0.57
+    task_4: 0.60
+    overall: 0.63
+
+  llm_agent:
+    model: Qwen/Qwen2.5-72B-Instruct
+    task_1: 0.85
+    task_2: 0.76
+    task_3: 0.65
+    task_4: 0.55
+    overall: 0.70
+
