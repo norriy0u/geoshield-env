@@ -191,7 +191,7 @@ Static JSONL data files (240 cases across 8 splits) are included as fallback.
 
 ## 🎨 Premium Tactical Dashboard
 
-For Phase 3 of the OpenEnv challenge, GeoShield includes a fully custom, brutalist C2 (Command and Control) frontend designed to showcase agent decision-making to human reviewers.
+GeoShield includes a fully custom, brutalist C2 (Command and Control) frontend designed to showcase agent decision-making to human reviewers.
 
 **Key UI Highlights:**
 - **Animated Dashboard:** Interactive SVG score gauge, live terminal event logger, and dynamically rendered intelligence sector cards.
