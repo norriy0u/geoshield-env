@@ -13,7 +13,6 @@ tags:
 [![OpenEnv](https://img.shields.io/badge/OpenEnv-compliant-blue)](https://huggingface.co/spaces/norriy0u/geoshield-env)
 [![HuggingFace](https://img.shields.io/badge/HF-HuggingFace%20Space-yellow)](https://huggingface.co/spaces/norriy0u/geoshield-env)
 [![Docker](https://img.shields.io/badge/Docker-ready-brightgreen)](./Dockerfile)
-[![Tests](https://img.shields.io/badge/Tests-37%20passing-green)](./tests/)
 
 > **Hackathon Submission**  
 > Developed for the 2026 Meta × HuggingFace × Scaler OpenEnv competition. All automated Phase 1 and Phase 2 evaluations successfully passed. Prepared for Phase 3 human review.
@@ -294,6 +293,25 @@ curl -X POST https://norriy0u-geoshield-env.hf.space/step \
   -H "Content-Type: application/json" \
   -d '{"action": "flag_for_review", "session_id": "<your_session_id>"}'
 ```
+### Full Episode Example (Task 4 — Covert Operation)
+```bash
+# Step 1 — Reset
+curl -X POST https://norriy0u-geoshield-env.hf.space/reset \
+  -H "Content-Type: application/json" \
+  -d '{"task_id": 4, "seed": 42}'
+
+# Step 2 — Request verification (gather intel)
+curl -X POST https://norriy0u-geoshield-env.hf.space/step \
+  -H "Content-Type: application/json" \
+  -d '{"action": "request_verification", "session_id": "<sid>"}'
+
+# Step 3 — Final decision with reasoning
+curl -X POST https://norriy0u-geoshield-env.hf.space/step \
+  -H "Content-Type: application/json" \
+  -d '{"action": "covert_operation", "cover_story_identified": "commercial drone delivery hub", "deception_type": "civilian_military", "reasoning": "Drone range and payload exceeds commercial specs. Military-grade encrypted communications detected in control room.", "session_id": "<sid>"}'
+```
+
+Then push and you're done. GO! 🚀
 
 ### Local Development
 ```bash
