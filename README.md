@@ -311,8 +311,6 @@ curl -X POST https://norriy0u-geoshield-env.hf.space/step \
   -d '{"action": "covert_operation", "cover_story_identified": "commercial drone delivery hub", "deception_type": "civilian_military", "reasoning": "Drone range and payload exceeds commercial specs. Military-grade encrypted communications detected in control room.", "session_id": "<sid>"}'
 ```
 
-Then push and you're done. GO! 🚀
-
 ### Local Development
 ```bash
 git clone https://github.com/norriy0u/geoshield-env
